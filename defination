@@ -1,6 +1,6 @@
 ('call', ('symbol', 'target'), 'function_name', [('symbol', 'para1'), ('constant', 'int_::make(123)')])
 
-('+'/'-'/'*'/'/','|','&','^','~', ('symbol', 'target'), ('symbol', 'para1'), ('constant', 'int_::make(123)'))
+('+'/'-'/'*'/'/','|','&','^','~','=' ('symbol', 'target'), ('symbol', 'para1'), ('constant', 'int_::make(123)'))
 
 ('if', ('symbol', 'test'), 10)
 

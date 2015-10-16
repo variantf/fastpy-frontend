@@ -10,104 +10,87 @@ class symbol_table:
 		'None': 'none::make',
 		'__add__': '__add__',
 		'__sub__': '__sub__',
+		'len': '__len__'
 	}]
-	def push_symbol_table():
-		sym_tb_stack.append({})
+	def push_sym_tb(self):
+		self.sym_tb_stack.append({})
 
-	def ppo_symbol_table():
-		sym_tb_stack.pop()
+	def pop_sym_tb(self):
+		self.sym_tb_stack.pop()
 
-	def add_symbol(key, value):
-		sym_tb_stack[key] = value
+	def add_symbol(self, key, value = None):
+		if None == value:
+			value = key
+		sym_tb_now = self.sym_tb_stack[len(self.sym_tb_stack) - 1]
+		if key in sym_tb_now:
+			raise Exception('key has already defined')
+		sym_tb_now[key] = value
 
-	def get_symbol(key, add = False):
-		last_idx = len(sym_tb_stack) - 1
+	def get_symbol(self, key, add = False):
+		last_idx = len(self.sym_tb_stack) - 1
 		if add:
-			if key in sym_tb_stack[last_idx]:
-				return sym_tb_stack[last_idx][key]
+			if key in self.sym_tb_stack[last_idx]:
+				return self.sym_tb_stack[last_idx][key]
 			else:
-				sym_tb_stack[last_idx][key] = key
+				self.sym_tb_stack[last_idx][key] = key
 				return key
 		else:
-			for i in range(len(sym_tb_stack)-1, 0, -1):
-				if key in sym_tb_stack[i]:
-					return sym_tb_stack[i][key]
-			raise Exception('can not find symbol')
+			for i in range(len(self.sym_tb_stack)-1, -1, -1):
+				if key in self.sym_tb_stack[i]:
+					return self.sym_tb_stack[i][key]
+			raise Exception('can not find symbol: ' + key)
 
 sym_tb = symbol_table()
 
 
-def gen_code_triple(code_type, a, b, c, target = triple_code_lines):
-	a = sym_tb.get_symbol(a)
-	b = sym_tb.get_symbol(b)
-	if code_type == 'call':
-		c = [symbol_table.get_symbol() for s in c]
+def gen_code_triple(code_type, a, b = None, c = None, target = triple_code_lines):
+	if code_type in ['jmp']:
+		target.append((code_type, a))
+	elif code_type in ['+', '-', '*', '/', '&', '|', '~', 'is', '==', '>', '<', '>=', '<=', '!=']:
+		target.append((code_type, a, b, c))
+	elif code_type in ['call']:
+		target.append((code_type, a, b, c))
+	elif code_type in ['if', 'ifnot']:
+		target.append((code_type, a, b))
+	elif code_type in ['=']:
+		target.append((code_type, a, b))
 	else:
-		c = sym_tb.get_symbol(c)
-	target.append((code_type, a, b, c))
+		raise Exception('Unknown instruction: ' + code_type)
 	return len(target) - 1
 
 def modify_target_for_currentIdx(idx, target = triple_code_lines):
-	target[idx] = (target[idx][0], target[idx][1], target[idx][2], len(target))
+	if target[idx][0] == 'if':
+		target[idx] = ('if', target[idx][1], len(target))
+	elif target[idx][0] == 'ifnot':
+		target[idx] = ('ifnot', target[idx][1], len(target))
+	elif target[idx][0] == 'jmp':
+		target[idx] = ('jmp', len(target))
+	else:
+		print(target[idx])
+		raise Exception('Unknown code type')
 
-
-local_sym_tb = set()
-
-file_output = open('output.cpp', 'w')
-
-header_lines = [
-	'#include <cstdio>',
-	'#include <stdexcept>',
-	'#include "assert.h"',
-	'#include "type.h"',
-	'#include "list.h"',
-	'#include "int.h"',
-	'#include "float.h"',
-	'#include "str.h"',
-	'#include "dict.h"',
-	'#include "bool.h"',
-	'#include "set.h"',
-	'#include "func.h"',
-	'#include "none.h"',
-	'#include "range.h"',
-	'#include "range_iterator.h"',
-	'int main() {'
-]
-
-declare_lines = []
-
-code_lines = []
+def get_currentIdx(target = triple_code_lines):
+	return len(triple_code_lines)
 
 def gen_name(n=5):
 	name = '_' + ''.join([random.choice('abcdefghighkmnopqrstuvwxyz') for _ in range(n)]) + '$'
 	sym_tb.add_symbol(name)
 	return ('symbol', name)
 
-indent = 0
-
-def code_yield(code, simi = True):
-	print('\t' * indent + code + (';' if simi else ''))
-	code_lines.append('\t' * indent + code + (';' if simi else ''))
-
-def code_enter_block():
-	global indent
-	code_yield('{', False)
-	indent = indent + 1
-
-def code_leave_block():
-	global indent
-	indent = indent - 1
-	code_yield('}', False)
+continue_stack = []
+break_stack = []
 
 def gen_dfs(node):
 	if type(node) is ast.Module:
+		sym_tb.push_sym_tb()
 		body = node.body
 		for stmt in body:
 			gen_dfs(stmt)
+		sym_tb.pop_sym_tb()
 		return
 	elif type(node) is ast.NameConstant:
 		if node.value is None:
-			return 'none::make()'
+			return ('constant', 'none::make()')
 		else:
 			raise Exception('Unknown NameConstant')
 	elif type(node) is ast.For:
@@ -115,17 +98,25 @@ def gen_dfs(node):
 		it = gen_dfs(node.iter)
 		iterator = gen_name()
 		gen_code_triple('call', iterator, '__iter__', [it])
-		gen_code_triple('call', target, '__next__', iterator)
+		continue_stack.append(gen_code_triple('call', target, '__next__', iterator))
+		break_stack.append([])
 		test = gen_name()
 		test_idx = gen_code_triple('==', test, target, ('constant', 'none::make()'))
-		gen_code_triple('if', test, 0)
+		ed_loop = gen_code_triple('if', test, 0)
 
 		for stmt in node.body:
 			gen_dfs(stmt)
 
 		gen_code_triple('call', target, '__next__', [iterator])
 		gen_code_triple('jmp', test_idx)
-		modify_target_for_currentIdx(test_idx)
+		modify_target_for_currentIdx(ed_loop)
+
+		for stmt in node.orelse:
+			gen_dfs(stmt)
+
+		brk = break_stack.pop()
+		for line in brk:
+			modify_target_for_currentIdx(line)
 	elif type(node) is ast.Num:
 		tmp_name = gen_name()
 		if type(node.n) is int:
@@ -140,26 +131,23 @@ def gen_dfs(node):
 		return gen_dfs(node.value)
 	elif type(node) is ast.Call:
 		tmp_name = gen_name()
-		gen_code_triple('call', )
-		code_yield(tmp_name + ' = ' + gen_dfs(node.func) + '(' + ', '.join([gen_dfs(arg) for arg in node.args]) + ')')
+		gen_code_triple('call', tmp_name, gen_dfs(node.func), [gen_dfs(arg) for arg in node.args])
 		return tmp_name
 	elif type(node) is ast.Name:
 		ctx = node.ctx
 		if type(ctx) is ast.Load:
-			return ('symbol', symbol_table.get_symbol(node.id))
+			return ('symbol', sym_tb.get_symbol(node.id))
 		elif type(ctx) is ast.Store:
-			if not node.id in sym_tb:
-				sym_tb[node.id] = node.id
-				declare_lines.append("value %s;" % node.id)
-		return sym_tb[node.id]
+			return ('symbol', sym_tb.get_symbol(node.id, True))
+		raise Exception('Unknown ctx for Name')
 	elif type(node) is ast.Assign:
 		for target in node.targets:
 			if type(target) is ast.Name:
-				code_yield(gen_dfs(target) + ' = ' + gen_dfs(node.value))
+				gen_code_triple('=', gen_dfs(target), gen_dfs(node.value))
 			elif type(target) is ast.Subscript:
 				(name, sub) = gen_dfs(target)
-				code_yield('__setitem__(%s, %s, %s)' % (name, sub, gen_dfs(node.value)))
-		return 'void'
+				gen_code_triple('call', '', '__setitem__', [name, sub, gen_dfs(node.value)])
+		return
 	elif type(node) is ast.BinOp:
 		if type(node.op) is ast.Add:
 			op = '+'
@@ -174,85 +162,141 @@ def gen_dfs(node):
 		elif type(node.op) is ast.BitAnd:
 			op = '&'
 		tmp_name = gen_name()
-		gen_code_triple()
-		code_yield('%s = %s(%s, %s)' % (tmp_name, op, gen_dfs(node.left), gen_dfs(node.right)))
+		gen_code_triple(op, tmp_name, gen_dfs(node.left), gen_dfs(node.right))
 		return tmp_name
 	elif type(node) is ast.UnaryOp:
 		tmp_name = gen_name()
 		if type(node.op) is ast.Invert:
-			code_yield('%s = __invert__(%s)', tmp_name, gen_dfs(node.operand))
+			gen_code_triple('~', tmp_name, gen_dfs(node.operand))
 		elif type(node.op) is ast.Not:
-			code_yield('%s = bool_::make(!__bool__(%s).boolval)', tmp_name, gen_dfs(node.operand))
+			gen_code_triple('call', tmp_name, '__not__', gen_dfs(node.operand))
 		else:
 			raise Exception('Unknown unary operator')
 	elif type(node) is ast.If:
-		res = gen_dfs(node.test)
-		code_yield('if(' + res + ')', False)
-		code_enter_block()
+		test = gen_dfs(node.test)
+		test_idx = gen_code_triple('ifnot', test, 0)
 		for stmt in node.body:
 			gen_dfs(stmt)
-		code_leave_block()
-		code_yield('else', False)
-		code_enter_block()
+		test_else_idx = gen_code_triple('jmp', 0)
+		modify_target_for_currentIdx(test_idx)
 		for stmt in node.orelse:
 			gen_dfs(stmt)
-		code_leave_block()
-		return 'void'
+		modify_target_for_currentIdx(test_else_idx)
+		return
 	elif type(node) is ast.BoolOp:
-		pass
+		ret_name = gen_name()
+		goto_ed = []
+		if node.op is ast.And:
+			for value in node.values:
+				value = node.values[i]
+				tmp_result = gen_dfs(value)
+				goto_ed.append(gen_code_triple('ifnot', tmp_result, 0))
+			for idx in goto_ed:
+				modify_target_for_currentIdx(idx)
+			return ret_name
+		elif node.op is ast.Or:
+			goto_ed = []
+			for value in node.values:
+				tmp_result = gen_dfs(value)
+				goto_ed.append(gen_code_triple('if', tmp_result, 0))
+			for idx in goto_ed:
+				modify_target_for_currentIdx(idx)
+			return ret_name
 	elif type(node) is ast.Compare:
 		tmp_name = gen_name()
+		ret_name = gen_name()
 		left = gen_dfs(node.left)
 		right_it = iter([gen_dfs(comparators) for comparators in node.comparators])
+		goto_ed = []
 		for op in node.ops:
+			right = next(right_it)
 			if type(op) is ast.Lt:
-				code_yield('%s = __lt__(%s, %s)' % (tmp_name, left, next(right_it)))
+				gen_code_triple('<', tmp_name, left, right)
 			elif type(op) is ast.Gt:
-				code_yield('%s = __gt__(%s, %s)' % (tmp_name, left, next(right_it)))
+				gen_code_triple('>', tmp_name, left, right)
 			elif type(op) is ast.Eq:
-				code_yield('%s = __eq__(%s, %s)' % (tmp_name, left, next(right_it)))
+				gen_code_triple('==', tmp_name, left, right)
 			elif type(op) is ast.LtE:
-				code_yield('%s = __le__(%s, %s)' % (tmp_name, left, next(right_it)))
+				gen_code_triple('<=', tmp_name, left, right)
 			elif type(op) is ast.GtE:
-				code_yield('%s = __ge__(%s, %s)' % (tmp_name, left, next(right_it)))
+				gen_code_triple('>=', tmp_name, left, right)
 			elif type(op) is ast.NotEq:
-				code_yield('%s = __ne__(%s, %s)' % (tmp_name, left, next(right_it)))
+				gen_code_triple('!=', tmp_name, left, right)
+			elif type(op) is ast.Is:
+				gen_code_triple('is', tmp_name, left, right)
 			else:
 				raise Exception('Unhandled Compare operators')
+			left = right
+			goto_ed.append(gen_code_triple('ifnot', tmp_name, 0))
 		return tmp_name
 	elif type(node) is ast.ListComp:
 		tmp_lst_name = gen_name()
-		code_yield(tmp_lst_name +' = list::make()')
+		gen_code_triple('call', tmp_lst_name, 'list::make', [])
 		for generator in node.generators:
 			target = gen_dfs(generator.target)
 			it = gen_dfs(generator.iter)
 			tmp_iter_name = gen_name()
-			code_yield('%s = __iter__(%s)' % (tmp_iter_name, it))
-			code_yield('for(%s = __next__(%s); %s != none::make(); %s = __next__(%s))' % (target, tmp_iter_name, target, target, tmp_iter_name), False)
-			code_enter_block()
+			gen_code_triple('call', tmp_iter_name, '__iter__', [it])
+			test_idx = gen_code_triple('call', target, '__next__', [tmp_iter_name])
+			test = gen_name()
+			gen_code_triple('==', test, target, ('constant', 'none::make()'))
+			ed_idx = gen_code_triple('if', test, 0)
 			elt = gen_dfs(node.elt)
-			code_yield('append(' + tmp_lst_name + ', %s)' % elt)
-			code_leave_block()
+			gen_code_triple('call', '', '__append__', [tmp_lst_name, elt])
+			gen_code_triple('jmp', test_idx)
+			modify_target_for_currentIdx(ed_idx)
 		return tmp_lst_name
 	elif type(node) is ast.Subscript:
 		name = gen_dfs(node.value)
 		sub = gen_dfs(node.slice.value)
 		if type(node.ctx) is ast.Load:
 			tmp_name = gen_name()
-			code_yield('%s = __getitem__(%s,%s)' % (tmp_name, name, sub))
+			gen_code_triple('call', tmp_name, '__getitem__', [name, sub])
 			return tmp_name
 		elif type(node.ctx) is ast.Store:
 			return (name, sub)
 		else:
 			raise Exception('Unknown ctx type')
+	elif type(node) is ast.While:
+		start_idx = get_currentIdx()
+		continue_stack.append(start_idx)
+
+		test_name = gen_dfs(node.test)
+		end_idx = gen_code_triple('ifnot', test_name, 0)
+		break_stack.append([])
+
+		for stmt in node.body:
+			gen_dfs(stmt)
+
+		gen_code_triple('jmp', start_idx)
+		brk = break_stack.pop()
+		for line in brk:
+			modify_target_for_currentIdx(line)
+
+		for stmt in node.orelse:
+			gen_dfs(stmt)
+
+		modify_target_for_currentIdx(end_idx)
+	elif type(node) is ast.Break:
+		break_stack[len(break_stack) - 1].append(gen_code_triple('jmp', 0))
+	elif type(node) is ast.Continue:
+		gen_code_triple('jmp', continue_stack[len(continue_stack) - 1])
 	else:
+		print(node)
 		raise Exception('Unknown node type ' + str(type(node)))
 
+
+f = open('py_code.py', 'r')
+code = ''.join(f.readlines())
 node = ast.parse(code)
 print(ast.dump(node))
 gen_dfs(node)
 
-file_output.write('\n'.join(header_lines) + '\n')
-file_output.write('\n'.join(declare_lines) + '\n')
-file_output.write('\n'.join(code_lines) + '\n')
-file_output.write('}\n')
+f = open('triple_code', 'w')
+for line in triple_code_lines:
+	print(line)
+	print(line, file = f)
+f.close()
+
+
+
