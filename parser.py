@@ -69,8 +69,11 @@ def modify_target_for_currentIdx(idx, target = triple_code_lines):
 		print(target[idx])
 		raise Exception('Unknown code type')
 
+def modify_target(idx, val, target = triple_code_lines):
+	target[idx] = (target[item][i] if 1 != i else val for i in range(len(target[idx])))
+
 def get_currentIdx(target = triple_code_lines):
-	return len(triple_code_lines)
+	return len(target)
 
 def gen_name(n=5):
 	name = '_' + ''.join([random.choice('abcdefghighkmnopqrstuvwxyz') for _ in range(n)]) + '$'
@@ -80,7 +83,7 @@ def gen_name(n=5):
 continue_stack = []
 break_stack = []
 
-def gen_dfs(node):
+def gen_dfs(node, idx = 0):
 	if type(node) is ast.Module:
 		sym_tb.push_sym_tb()
 		body = node.body
@@ -126,12 +129,12 @@ def gen_dfs(node):
 		else:
 			raise 'Unknown number type'
 	elif type(node) is ast.Str:
-		return ('constant', 'str::make("%s")' % node.s)
+		return ('constant', 'str::make("%s")' % repr(node.s)[1:-1])
 	elif type(node) is ast.Expr:
 		return gen_dfs(node.value)
 	elif type(node) is ast.Call:
 		tmp_name = gen_name()
-		gen_code_triple('call', tmp_name, gen_dfs(node.func), [gen_dfs(arg) for arg in node.args])
+		gen_code_triple('call', tmp_name, gen_dfs(node.func)[1], [gen_dfs(arg) for arg in node.args])
 		return tmp_name
 	elif type(node) is ast.Name:
 		ctx = node.ctx
@@ -141,12 +144,13 @@ def gen_dfs(node):
 			return ('symbol', sym_tb.get_symbol(node.id, True))
 		raise Exception('Unknown ctx for Name')
 	elif type(node) is ast.Assign:
+		source_name = gen_dfs(node.value)
 		for target in node.targets:
 			if type(target) is ast.Name:
-				gen_code_triple('=', gen_dfs(target), gen_dfs(node.value))
+				gen_code_triple('=', gen_dfs(target), source_name)
 			elif type(target) is ast.Subscript:
 				(name, sub) = gen_dfs(target)
-				gen_code_triple('call', '', '__setitem__', [name, sub, gen_dfs(node.value)])
+				gen_code_triple('call', None, '__setitem__', [name, sub, gen_dfs(node.value)])
 		return
 	elif type(node) is ast.BinOp:
 		if type(node.op) is ast.Add:
@@ -169,7 +173,7 @@ def gen_dfs(node):
 		if type(node.op) is ast.Invert:
 			gen_code_triple('~', tmp_name, gen_dfs(node.operand))
 		elif type(node.op) is ast.Not:
-			gen_code_triple('call', tmp_name, '__not__', gen_dfs(node.operand))
+			gen_code_triple('call', tmp_name, '__not__', [gen_dfs(node.operand)])
 		else:
 			raise Exception('Unknown unary operator')
 	elif type(node) is ast.If:
@@ -177,38 +181,48 @@ def gen_dfs(node):
 		test_idx = gen_code_triple('ifnot', test, 0)
 		for stmt in node.body:
 			gen_dfs(stmt)
-		test_else_idx = gen_code_triple('jmp', 0)
-		modify_target_for_currentIdx(test_idx)
-		for stmt in node.orelse:
-			gen_dfs(stmt)
-		modify_target_for_currentIdx(test_else_idx)
+		if node.orelse:
+			test_else_idx = gen_code_triple('jmp', 0)
+			modify_target_for_currentIdx(test_idx)
+			for stmt in node.orelse:
+				gen_dfs(stmt)
+			modify_target_for_currentIdx(test_else_idx)
+		else:
+			modify_target_for_currentIdx(test_idx)
 		return
 	elif type(node) is ast.BoolOp:
 		ret_name = gen_name()
 		goto_ed = []
-		if node.op is ast.And:
-			for value in node.values:
+		if type(node.op) is ast.And:
+			for i in range(len(node.values)):
 				value = node.values[i]
 				tmp_result = gen_dfs(value)
-				goto_ed.append(gen_code_triple('ifnot', tmp_result, 0))
+				gen_code_triple('=', ret_name, tmp_result)
+				if i != len(node.values) - 1:
+					goto_ed.append(gen_code_triple('ifnot', tmp_result, 0))
 			for idx in goto_ed:
 				modify_target_for_currentIdx(idx)
 			return ret_name
-		elif node.op is ast.Or:
+		elif type(node.op) is ast.Or:
 			goto_ed = []
-			for value in node.values:
+			for i in range(len(node.values)):
+				value = node.values[i]
 				tmp_result = gen_dfs(value)
-				goto_ed.append(gen_code_triple('if', tmp_result, 0))
+				gen_code_triple('=', ret_name, tmp_result)
+				if i != len(node.values) - 1:
+					goto_ed.append(gen_code_triple('if', tmp_result, 0))
 			for idx in goto_ed:
 				modify_target_for_currentIdx(idx)
-			return ret_name
+			return tmp_result
+		else:
+			raise Exception('Unknown op type for BoolOp')
 	elif type(node) is ast.Compare:
 		tmp_name = gen_name()
-		ret_name = gen_name()
 		left = gen_dfs(node.left)
 		right_it = iter([gen_dfs(comparators) for comparators in node.comparators])
 		goto_ed = []
-		for op in node.ops:
+		for i in range(len(node.ops)):
+			op = node.ops[i]
 			right = next(right_it)
 			if type(op) is ast.Lt:
 				gen_code_triple('<', tmp_name, left, right)
@@ -227,11 +241,14 @@ def gen_dfs(node):
 			else:
 				raise Exception('Unhandled Compare operators')
 			left = right
-			goto_ed.append(gen_code_triple('ifnot', tmp_name, 0))
+			if i != len(node.ops) - 1:
+				goto_ed.append(gen_code_triple('ifnot', tmp_name, 0))
+		for idx in goto_ed:
+			modify_target_for_currentIdx(idx)
 		return tmp_name
 	elif type(node) is ast.ListComp:
 		tmp_lst_name = gen_name()
-		gen_code_triple('call', tmp_lst_name, 'list::make', [])
+		gen_code_triple('=', tmp_lst_name, 'list::make()')
 		for generator in node.generators:
 			target = gen_dfs(generator.target)
 			it = gen_dfs(generator.iter)
@@ -242,7 +259,7 @@ def gen_dfs(node):
 			gen_code_triple('==', test, target, ('constant', 'none::make()'))
 			ed_idx = gen_code_triple('if', test, 0)
 			elt = gen_dfs(node.elt)
-			gen_code_triple('call', '', '__append__', [tmp_lst_name, elt])
+			gen_code_triple('call', None, 'append', [tmp_lst_name, elt])
 			gen_code_triple('jmp', test_idx)
 			modify_target_for_currentIdx(ed_idx)
 		return tmp_lst_name
@@ -270,17 +287,39 @@ def gen_dfs(node):
 
 		gen_code_triple('jmp', start_idx)
 		brk = break_stack.pop()
-		for line in brk:
-			modify_target_for_currentIdx(line)
+
+		modify_target_for_currentIdx(end_idx)
 
 		for stmt in node.orelse:
 			gen_dfs(stmt)
 
-		modify_target_for_currentIdx(end_idx)
+		for line in brk:
+			modify_target_for_currentIdx(line)
+
 	elif type(node) is ast.Break:
 		break_stack[len(break_stack) - 1].append(gen_code_triple('jmp', 0))
 	elif type(node) is ast.Continue:
 		gen_code_triple('jmp', continue_stack[len(continue_stack) - 1])
+	elif type(node) is ast.List:
+		list_name = gen_name()
+		gen_code_triple('=', list_name, 'list::make()')
+		for ele in node.elts:
+			gen_code_triple('call', None, 'append', [list_name, gen_dfs(ele)])
+		return list_name
+	elif type(node) is ast.Set:
+		set_name = gen_name()
+		gen_code_triple('=', set_name, 'set::make()')
+		for ele in node.elts:
+			gen_code_triple('call', None, 'add', [set_name, gen_dfs(ele)])
+		return set_name
+	elif type(node) is ast.Dict:
+		dict_name = gen_name()
+		gen_code_triple('=', dict_name, 'dict::make()')
+		for i in range(len(node.keys)):
+			key = gen_dfs(node.keys[i])
+			value = gen_dfs(node.values[i])
+			gen_code_triple('call', None, '__setitem__', [dict_name, key, value])
+		return dict_name
 	else:
 		print(node)
 		raise Exception('Unknown node type ' + str(type(node)))
@@ -289,7 +328,7 @@ def gen_dfs(node):
 f = open('py_code.py', 'r')
 code = ''.join(f.readlines())
 node = ast.parse(code)
-print(ast.dump(node))
+#print(ast.dump(node))
 gen_dfs(node)
 
 f = open('triple_code', 'w')
