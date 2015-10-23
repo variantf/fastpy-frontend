@@ -134,7 +134,10 @@ def gen_dfs(node, idx = 0):
 		return gen_dfs(node.value)
 	elif type(node) is ast.Call:
 		tmp_name = gen_name()
-		gen_code_triple('call', tmp_name, gen_dfs(node.func)[1], [gen_dfs(arg) for arg in node.args])
+		if type(node.func) is ast.Name:
+			gen_code_triple('call', tmp_name, node.func.id, [gen_dfs(arg) for arg in node.args])
+		elif type(node.func) is ast.Attribute:
+			gen_code_triple('call', tmp_name, node.func.attr, [gen_dfs(node.func.value)] + [gen_dfs(arg) for arg in node.args])
 		return tmp_name
 	elif type(node) is ast.Name:
 		ctx = node.ctx
