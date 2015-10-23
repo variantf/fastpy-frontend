@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import ast
 import random
 
@@ -92,10 +93,7 @@ def gen_dfs(node, idx = 0):
 		sym_tb.pop_sym_tb()
 		return
 	elif type(node) is ast.NameConstant:
-		if node.value is None:
-			return ('constant', 'none::make()')
-		else:
-			raise Exception('Unknown NameConstant')
+	    return ('constant', node.value)
 	elif type(node) is ast.For:
 		target = gen_dfs(node.target)
 		it = gen_dfs(node.iter)
@@ -104,7 +102,7 @@ def gen_dfs(node, idx = 0):
 		continue_stack.append(gen_code_triple('call', target, '__next__', iterator))
 		break_stack.append([])
 		test = gen_name()
-		test_idx = gen_code_triple('==', test, target, ('constant', 'none::make()'))
+		test_idx = gen_code_triple('==', test, target, ('constant', None))
 		ed_loop = gen_code_triple('if', test, 0)
 
 		for stmt in node.body:
@@ -121,15 +119,9 @@ def gen_dfs(node, idx = 0):
 		for line in brk:
 			modify_target_for_currentIdx(line)
 	elif type(node) is ast.Num:
-		tmp_name = gen_name()
-		if type(node.n) is int:
-			return ('constant', 'int_::make(%d)' % node.n)
-		elif type(node.n) is float:
-			return ('constant', 'float::make(%f)' % node.n)
-		else:
-			raise 'Unknown number type'
+		return ('constant', node.n)
 	elif type(node) is ast.Str:
-		return ('constant', 'str::make("%s")' % repr(node.s)[1:-1])
+		return ('constant', node.s)
 	elif type(node) is ast.Expr:
 		return gen_dfs(node.value)
 	elif type(node) is ast.Call:
@@ -251,7 +243,7 @@ def gen_dfs(node, idx = 0):
 		return tmp_name
 	elif type(node) is ast.ListComp:
 		tmp_lst_name = gen_name()
-		gen_code_triple('=', tmp_lst_name, 'list::make()')
+		gen_code_triple('=', tmp_lst_name, ('constant', []))
 		for generator in node.generators:
 			target = gen_dfs(generator.target)
 			it = gen_dfs(generator.iter)
@@ -259,7 +251,7 @@ def gen_dfs(node, idx = 0):
 			gen_code_triple('call', tmp_iter_name, '__iter__', [it])
 			test_idx = gen_code_triple('call', target, '__next__', [tmp_iter_name])
 			test = gen_name()
-			gen_code_triple('==', test, target, ('constant', 'none::make()'))
+			gen_code_triple('==', test, target, ('constant', None))
 			ed_idx = gen_code_triple('if', test, 0)
 			elt = gen_dfs(node.elt)
 			gen_code_triple('call', None, 'append', [tmp_lst_name, elt])
@@ -305,19 +297,19 @@ def gen_dfs(node, idx = 0):
 		gen_code_triple('jmp', continue_stack[len(continue_stack) - 1])
 	elif type(node) is ast.List:
 		list_name = gen_name()
-		gen_code_triple('=', list_name, 'list::make()')
+		gen_code_triple('=', list_name, ('constant', []))
 		for ele in node.elts:
 			gen_code_triple('call', None, 'append', [list_name, gen_dfs(ele)])
 		return list_name
 	elif type(node) is ast.Set:
 		set_name = gen_name()
-		gen_code_triple('=', set_name, 'set::make()')
+		gen_code_triple('=', set_name, ('constant', set()))
 		for ele in node.elts:
 			gen_code_triple('call', None, 'add', [set_name, gen_dfs(ele)])
 		return set_name
 	elif type(node) is ast.Dict:
 		dict_name = gen_name()
-		gen_code_triple('=', dict_name, 'dict::make()')
+		gen_code_triple('=', dict_name, ('constant', dict()))
 		for i in range(len(node.keys)):
 			key = gen_dfs(node.keys[i])
 			value = gen_dfs(node.values[i])
