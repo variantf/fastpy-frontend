@@ -47,7 +47,7 @@ sym_tb = symbol_table()
 def gen_code_triple(code_type, a, b = None, c = None, target = triple_code_lines):
 	if code_type in ['jmp']:
 		target.append((code_type, a))
-	elif code_type in ['+', '-', '*', '/', '&', '|', '~', 'is', '==', '>', '<', '>=', '<=', '!=']:
+	elif code_type in ['+', '-', '*', '/', '&', '|', '~', 'is', '==', '>', '<', '>=', '<=', '!=', '>>', '<<', '%']:
 		target.append((code_type, a, b, c))
 	elif code_type in ['call']:
 		target.append((code_type, a, b, c))
@@ -76,15 +76,20 @@ def modify_target(idx, val, target = triple_code_lines):
 def get_currentIdx(target = triple_code_lines):
 	return len(target)
 
+name_id = 0
+
 def gen_name(n=5):
-	name = '_' + ''.join([random.choice('abcdefghighkmnopqrstuvwxyz') for _ in range(n)]) + '$'
+	#name = '_' + ''.join([random.choice('abcdefghighkmnopqrstuvwxyz') for _ in range(n)]) + '$'
+	global name_id
+	name_id = name_id + 1
+	name = '_' + str(name_id) + '$'
 	sym_tb.add_symbol(name)
 	return ('symbol', name)
 
 continue_stack = []
 break_stack = []
 
-def gen_dfs(node, idx = 0):
+def gen_dfs(node):
 	if type(node) is ast.Module:
 		sym_tb.push_sym_tb()
 		body = node.body
@@ -160,6 +165,16 @@ def gen_dfs(node, idx = 0):
 			op = '|'
 		elif type(node.op) is ast.BitAnd:
 			op = '&'
+		elif type(node.op) is ast.BitXor:
+			op = '^'
+		elif type(node.op) is ast.RShift:
+			op = '>>'
+		elif type(node.op) is ast.LShift:
+			op = '<<'
+		elif type(node.op) is ast.Mod:
+			op = '%'
+		else:
+			raise Exception('Unknown op')
 		tmp_name = gen_name()
 		gen_code_triple(op, tmp_name, gen_dfs(node.left), gen_dfs(node.right))
 		return tmp_name
@@ -241,23 +256,59 @@ def gen_dfs(node, idx = 0):
 		for idx in goto_ed:
 			modify_target_for_currentIdx(idx)
 		return tmp_name
+	elif type(node) is ast.comprehension:
+		target = gen_dfs(node.target)
+		it = gen_dfs(node.iter)
+		tmp_iter_name = gen_name()
+		gen_code_triple('call', tmp_iter_name, '__iter__', [it])
+		test_idx = gen_code_triple('call', target, '__next__', [tmp_iter_name])
+		test = gen_name()
+		gen_code_triple('==', test, target, ('constant', None))
+		ed_idx = gen_code_triple('if', test, 0)
+		for _if in node.ifs:
+			if_name = gen_dfs(_if)
+			gen_code_triple('ifnot', if_name, test_idx)
+		return (test_idx, ed_idx)
 	elif type(node) is ast.ListComp:
 		tmp_lst_name = gen_name()
 		gen_code_triple('=', tmp_lst_name, ('constant', []))
+		idxs = []
 		for generator in node.generators:
-			target = gen_dfs(generator.target)
-			it = gen_dfs(generator.iter)
-			tmp_iter_name = gen_name()
-			gen_code_triple('call', tmp_iter_name, '__iter__', [it])
-			test_idx = gen_code_triple('call', target, '__next__', [tmp_iter_name])
-			test = gen_name()
-			gen_code_triple('==', test, target, ('constant', None))
-			ed_idx = gen_code_triple('if', test, 0)
-			elt = gen_dfs(node.elt)
-			gen_code_triple('call', None, 'append', [tmp_lst_name, elt])
+			idxs.append(gen_dfs(generator))
+		elt = gen_dfs(node.elt)
+		gen_code_triple('call', None, 'append', [tmp_lst_name, elt])
+		while len(idxs) > 0:
+			test_idx, ed_idx = idxs.pop()
 			gen_code_triple('jmp', test_idx)
 			modify_target_for_currentIdx(ed_idx)
 		return tmp_lst_name
+	elif type(node) is ast.SetComp:
+		tmp_set_name = gen_name()
+		gen_code_triple('=', tmp_set_name, ('constant', set()))
+		idxs = []
+		for generator in node.generators:
+			idxs.append(gen_dfs(generator))
+		elt = gen_dfs(node.elt)
+		gen_code_triple('call', None, 'append', [tmp_set_name, elt])
+		while len(idxs) > 0:
+			test_idx, ed_idx = idxs.pop()
+			gen_code_triple('jmp', test_idx)
+			modify_target_for_currentIdx(ed_idx)
+		return tmp_set_name
+	elif type(node) is ast.DictComp:
+		tmp_dict_name = gen_name()
+		gen_code_triple('=', tmp_dict_name, ('constant', {}))
+		idxs = []
+		for generator in node.generators:
+			idxs.append(gen_dfs(generator))
+		key = gen_dfs(node.key)
+		val = gen_dfs(node.value)
+		gen_code_triple('call', None, 'append', [tmp_dict_name, key, val])
+		while len(idxs) > 0:
+			test_idx, ed_idx = idxs.pop()
+			gen_code_triple('jmp', test_idx)
+			modify_target_for_currentIdx(ed_idx)
+		return tmp_dict_name
 	elif type(node) is ast.Subscript:
 		name = gen_dfs(node.value)
 		sub = gen_dfs(node.slice.value)

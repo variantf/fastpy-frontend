@@ -1,7 +1,9 @@
 l = [1,2,3]
 l.append(4)
 s = {1,2,3}
+s = {a for a in range(10)}
 d = {1:1, 2:2, 3:3}
+d = {a:b for a in range(10) if a % 2 == 0 if a % 3 == 0 for b in range(10)}
 d = {}
 a = 1.0
 b = a + 5
