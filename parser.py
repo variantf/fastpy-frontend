@@ -6,12 +6,10 @@ triple_code_lines = []
 
 class symbol_table:
 	sym_tb_stack = [{
-		'range': 'range::__init__',
-		'__iter__': '__iter__',
-		'None': 'none::make',
-		'__add__': '__add__',
-		'__sub__': '__sub__',
-		'len': '__len__'
+		'iter': '__iter__',
+		'len': '__len__',
+		'append': 'append',
+		'range': 'range'
 	}]
 	def push_sym_tb(self):
 		self.sym_tb_stack.append({})
@@ -132,9 +130,9 @@ def gen_dfs(node):
 	elif type(node) is ast.Call:
 		tmp_name = gen_name()
 		if type(node.func) is ast.Name:
-			gen_code_triple('call', tmp_name, node.func.id, [gen_dfs(arg) for arg in node.args])
+			gen_code_triple('call', tmp_name, sym_tb.get_symbol(node.func.id), [gen_dfs(arg) for arg in node.args])
 		elif type(node.func) is ast.Attribute:
-			gen_code_triple('call', tmp_name, node.func.attr, [gen_dfs(node.func.value)] + [gen_dfs(arg) for arg in node.args])
+			gen_code_triple('call', tmp_name, sym_tb.get_symbol(node.func.attr), [gen_dfs(node.func.value)] + [gen_dfs(arg) for arg in node.args])
 		return tmp_name
 	elif type(node) is ast.Name:
 		ctx = node.ctx

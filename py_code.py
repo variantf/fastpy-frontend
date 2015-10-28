@@ -1,4 +1,5 @@
 l = [1,2,3]
+len(l)
 l.append(4)
 s = {1,2,3}
 s = {a for a in range(10)}
