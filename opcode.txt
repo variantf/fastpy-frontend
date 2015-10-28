@@ -1,0 +1,9 @@
+L-VALUE :== ('symbol', IDENTIFIER)
+R-VALUE :== ('symbol', IDENTIFIER) | ('constant', VALUE)
+BINARY-OP :== '+' | '-' | '*' | '/' | '%' | '>' | '<' | '>=' | '<=' | '&' | '|' | '^' | '<<' | '>>' | '=='
+UNARY-OP :== '=' | '~'
+CALL :== ('call', L-VALUE | None, FUNCTION-NAME, [R-VALUE])
+BINARY :== (BINARY-OP, L-VALUE, R-VALUE, R-VALUE)
+UNARY :== (UNARY-OP, L-VALUE, R-VALUE)
+IF :== ('if' | 'ifnot', R-VALUE, LINE-NUMBER)
+JMP :== ('jmp', LINE-NUMBER)
