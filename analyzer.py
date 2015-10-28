@@ -58,11 +58,7 @@ def analyze_forward(src, merge_func, step_func, init_state, empty_state):
         else:
             state_in[line] = merge_func(from_states)
         
-        code = src[line]
-        if code[0] in ['jmp', 'if', 'ifnot']:
-            new_state = state_in[line]
-        else:
-            new_state = step_func(state_in[line], code)
+        new_state = step_func(state_in[line], src[line])
         if new_state == state_out[line]:
             continue
         state_out[line] = new_state
@@ -77,7 +73,6 @@ def analyze_backward(src, merge_func, step_func, empty_state):
         Must not change states
     step_func: (state_old, code) -> state_new
         Must not change state_old
-    // final_state: the state after the whole program
     empty_state
     """
     state_in = [empty_state for i in range(len(src))]
@@ -112,11 +107,7 @@ def analyze_backward(src, merge_func, step_func, empty_state):
         else:
             state_in[line] = merge_func(from_states)
         
-        code = src[line]
-        if code[0] in ['jmp', 'if', 'ifnot']:
-            new_state = state_in[line]
-        else:
-            new_state = step_func(state_in[line], code)
+        new_state = step_func(state_in[line], src[line])
         if new_state == state_out[line]:
             continue
         state_out[line] = new_state
