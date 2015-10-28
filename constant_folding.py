@@ -74,6 +74,8 @@ def step(old, code):
         bin_op(lambda x,y: x >= y)
     elif code[0] == '==':
         bin_op(lambda x,y: x == y)
+    elif code[0] == '!=':
+        bin_op(lambda x,y: x != y)
     elif code[0] == '~':
         exists, v = get_value(2)
         if not exists:
