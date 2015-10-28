@@ -9,3 +9,6 @@ Types:
 ('list', some_type)
 ('set', some_type)
 ('dict', some_key_type, some_value_type)
+('range')
+('range_iterator')
+('slice')

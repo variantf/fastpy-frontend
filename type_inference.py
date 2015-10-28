@@ -1,3 +1,23 @@
+import copy
+
+import analyzer
+from optimizer import UNARY_OPERATORS, BINARY_OPERATORS
+
+REL_OP_RULES = [
+    ([(('bool',),), (('bool',),)], ('bool',)),
+    ([(('bool',),), (('int',),)], ('bool',)),
+    ([(('bool',),), (('float',),)], ('bool',)),
+    ([(('int',),), (('bool',),)], ('bool',)),
+    ([(('int',),), (('int',),)], ('bool',)),
+    ([(('int',),), (('float',),)], ('bool',)),
+    ([(('float',),), (('bool',),)], ('bool',)),
+    ([(('float',),), (('int',),)], ('bool',)),
+    ([(('float',),), (('float',),)], ('bool',)),
+    ([(('list', 'T'),), (('list', 'E'),)], ('bool',)),
+    ([(('set', 'T'),), (('set', 'E'),)], ('bool',)),
+    ([(('dict', 'T', 'E'),), (('dict', 'U', 'V'),)], ('bool',)),
+]
+
 TYPE_RULES = {
     '=': [
         ([('E',)], 'E')
@@ -71,10 +91,79 @@ TYPE_RULES = {
         ([(('float',),), (('int',),)], ('float',)),
         ([(('float',),), (('float',),)], ('float',))
     ],
+    '==': [
+        ([('T',), ('E',)], ('bool',)),
+    ],
+    '>': REL_OP_RULES,
+    '<': REL_OP_RULES,
+    '<=': REL_OP_RULES,
+    '>=': REL_OP_RULES,
     'append': [
         ([(('list', 'T'), ('list', ('$merge', 'T', 'E'))), 'E'], ('none',))
-    ]
+    ],
+    'add': [
+        ([(('set', 'T'), ('set', ('$merge', 'T', 'E'))), 'E'], ('none',))
+    ],
+    'range': [
+        ([(('int',),)], ('range',)),
+        ([(('int',),),(('int',),)], ('range',)),
+        ([(('int',),),(('int',),),(('int',),)], ('range',)),
+    ],
+    '__iter__': [
+        ([(('range',),)], ('range_iterator',)),
+    ],
+    '__next__': [
+        ([(('range_iterator',),)], ('int',)),
+    ],
+    '__setitem__': [
+        ([(('list', 'T'), ('list', ('$merge', 'T', 'E'))), (('int',),), ('E',)], ('none',)),
+        ([(('list', 'T'), ('list', ('$merge', 'T', 'E'))), (('slice',),), (('list', 'E'),)], ('none',)),
+        ([(('dict', 'K', 'V'), ('dict', ('$merge', 'K', 'T'), ('$merge', 'V', 'E'))), ('T',), ('E',)], ('none',)),
+    ],
+    '__getitem__': [
+        ([(('str',),), (('int',),)], ('str',)),
+        ([(('list', 'T'),), (('int',),)], 'T'),
+        ([(('list', 'T'),), (('slice',),)], ('list', 'T')),
+        ([(('dict', 'K', 'V'),), ('T',)], 'V'),
+    ],
+    '__len__': [
+        ([(('str',),)], ('int',)),
+        ([(('list', 'T'),)], ('int',)),
+        ([(('set', 'T'),)], ('int',)),
+        ([(('dict', 'T', 'E'),)], ('int',)),
+    ],
 }
+
+def type_inference(src):
+    states, states_out = analyzer.analyze_forward(src, merge, step, {}, {})
+    
+    def add_type(v, state):
+        if v[0] == 'symbol':
+            return ('symbol', v[1], state[v[1]])
+        if v[0] == 'constant':
+            return ('constant', v[1], constant_type(v[1]))
+        raise Exception("Unknown value: " + str(v))
+    
+    for i in range(len(src)):
+        code = list(src[i])
+        if code[0] in UNARY_OPERATORS:
+            code[1] = add_type(code[1], states_out[i])
+            code[2] = add_type(code[2], states[i])
+        elif code[0] in BINARY_OPERATORS:
+            code[1] = add_type(code[1], states_out[i])
+            code[2] = add_type(code[2], states[i])
+            code[3] = add_type(code[3], states[i])
+        elif code[0] == 'call':
+            if code[1] is not None:
+                code[1] = add_type(code[1], states_out[i])
+            code[3] = [add_type(x, states[i]) for x in code[3]]
+        elif code[0] in ['if', 'ifnot']:
+            code[1] = add_type(code[1], states[i])
+        elif code[0] != 'jmp':
+            raise Exception('Unhandled op: ' + code[0])
+        src[i] = tuple(code)
+    
+    return src
 
 def merge(states):
     variables = set()
@@ -88,7 +177,7 @@ def merge(states):
             the_type = merge_type(the_type, s.get(var, ('dynamic',)))
         ret[var] = the_type
     return ret
-"""
+
 def step(old, code):
     if code[0] in ['if','ifnot','jmp']:
         return old
@@ -100,24 +189,30 @@ def step(old, code):
             return constant_type(v[1])
         raise Exception('Unknown value: ' + str(v))
     
+    def set_type(v, t):
+        if v[0] == 'symbol':
+            new[v[1]] = t
+    
     new = copy.copy(old)
     if code[0] in UNARY_OPERATORS:
-        new[code[1][1]] = predict_type(code[0], [get_type(code[2])])
+        infered = infer_type(code[0], [get_type(code[2])])
+        set_type(code[2], infered[0])
+        set_type(code[1], infered[1])
     elif code[0] in BINARY_OPERATORS:
-        new[code[1][1]] = predict_type(code[0], [get_type(code[2]), get_type(code[3])])
+        infered = infer_type(code[0], [get_type(code[2]), get_type(code[3])])
+        set_type(code[2], infered[0])
+        set_type(code[3], infered[1])
+        set_type(code[1], infered[2])
     elif code[0] == 'call':
+        infered = infer_type(code[2], [get_type(arg) for arg in code[3]])
+        for i in range(len(code[3])):
+            set_type(code[3][i], infered[i])
         if code[1] is not None:
-            new[code[1][1]] = predict_type(code[2], [get_type(arg) for arg in code[3]])
+            set_type(code[1], infered[len(code[3])])
     else:
         raise Exception('Unknown op: ' + code[0])
     return new
-    
-    states, states_out = analyzer.analyze_forward(src, merge, step, {}, {})
-    
-    for i in range(len(src)):
-        print(states[i])
-        print(src[i])
-"""
+
 def infer_type(fn, args):
     for arg in args:
         if arg[0] == 'any':
@@ -130,7 +225,7 @@ def infer_type(fn, args):
         arg_tpl = rule[0]
         ret_tpl = rule[1]
         if len(arg_tpl) != len(args):
-            raise Exception('Inconsistent number of arguments')
+            continue
         
         params = {}
         all_matched = True
@@ -151,7 +246,7 @@ def infer_type(fn, args):
             infered[i] = merge_type(infered[i], arg_type)
     
     if not matched:
-        raise Exception('Type error for ' + fn)
+        raise Exception('Type error for ' + fn + ' args: ' + str(args))
     return infered
 
 def merge_type(ta, tb):
@@ -163,7 +258,7 @@ def merge_type(ta, tb):
         return ta
     if ta[0] != tb[0]:
         return ('dynamic',)
-    if ta[0] in ['none','bool','int','float','str']:
+    if ta[0] in ['none','bool','int','float','str','range','range_iterator','slice']:
         return ta
     if ta[0] in ['list', 'set']:
         return (ta[0], merge_type(ta[1],tb[1]))
@@ -178,7 +273,7 @@ def constant_type(c):
         return ('bool',)
     if type(c) == int:
         return ('int',)
-    if type(c) == 'float':
+    if type(c) == float:
         return ('float',)
     if type(c) == str:
         return ('str',)
@@ -187,7 +282,7 @@ def constant_type(c):
     if c == set():
         return ('set', ('any',))
     if c == {}:
-        return ('dict', ('any',))
+        return ('dict', ('any',), ('any',))
     raise Exception('Unknown constant: ' + str(c))
 
 def pattern_match(template, value, params):

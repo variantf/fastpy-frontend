@@ -104,7 +104,7 @@ def gen_dfs(node):
 		it = gen_dfs(node.iter)
 		iterator = gen_name()
 		gen_code_triple('call', iterator, '__iter__', [it])
-		continue_stack.append(gen_code_triple('call', target, '__next__', iterator))
+		continue_stack.append(gen_code_triple('call', target, '__next__', [iterator]))
 		break_stack.append([])
 		test = gen_name()
 		test_idx = gen_code_triple('==', test, target, ('constant', None))
@@ -289,7 +289,7 @@ def gen_dfs(node):
 		for generator in node.generators:
 			idxs.append(gen_dfs(generator))
 		elt = gen_dfs(node.elt)
-		gen_code_triple('call', None, 'append', [tmp_set_name, elt])
+		gen_code_triple('call', None, 'add', [tmp_set_name, elt])
 		while len(idxs) > 0:
 			test_idx, ed_idx = idxs.pop()
 			gen_code_triple('jmp', test_idx)
@@ -303,7 +303,7 @@ def gen_dfs(node):
 			idxs.append(gen_dfs(generator))
 		key = gen_dfs(node.key)
 		val = gen_dfs(node.value)
-		gen_code_triple('call', None, 'append', [tmp_dict_name, key, val])
+		gen_code_triple('call', None, '__setitem__', [tmp_dict_name, key, val])
 		while len(idxs) > 0:
 			test_idx, ed_idx = idxs.pop()
 			gen_code_triple('jmp', test_idx)
