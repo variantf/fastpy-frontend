@@ -15,5 +15,6 @@ src = successive_jump(src)
 src = jump_next(src)
 src = type_inference(src)
 
-for l in src:
-    print(l)
+with open('optimized', 'w') as f:
+	for l in src:
+		print(l, file=f)

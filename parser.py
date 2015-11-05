@@ -9,7 +9,9 @@ class symbol_table:
 		'iter': '__iter__',
 		'len': '__len__',
 		'append': 'append',
-		'range': 'range'
+		'range': 'range',
+		'slice': 'slice',
+		'print': 'print'
 	}]
 	def push_sym_tb(self):
 		self.sym_tb_stack.append({})
@@ -369,7 +371,7 @@ def gen_dfs(node):
 		raise Exception('Unknown node type ' + str(type(node)))
 
 
-f = open('py_code.py', 'r')
+f = open('tests/lcs.py', 'r')
 code = ''.join(f.readlines())
 node = ast.parse(code)
 #print(ast.dump(node))
