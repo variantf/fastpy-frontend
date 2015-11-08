@@ -371,7 +371,7 @@ def gen_dfs(node):
 		raise Exception('Unknown node type ' + str(type(node)))
 
 
-f = open('tests/lcs.py', 'r')
+f = open('py_code.py', 'r')
 code = ''.join(f.readlines())
 node = ast.parse(code)
 #print(ast.dump(node))

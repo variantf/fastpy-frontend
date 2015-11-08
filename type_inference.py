@@ -3,197 +3,172 @@ import copy
 import analyzer
 from optimizer import UNARY_OPERATORS, BINARY_OPERATORS
 
+# Simple Type Rules
 REL_OP_RULES = [
-    ([(('bool',),), (('bool',),)], ('bool',)),
-    ([(('bool',),), (('int',),)], ('bool',)),
-    ([(('bool',),), (('float',),)], ('bool',)),
-    ([(('int',),), (('bool',),)], ('bool',)),
-    ([(('int',),), (('int',),)], ('bool',)),
-    ([(('int',),), (('float',),)], ('bool',)),
-    ([(('float',),), (('bool',),)], ('bool',)),
-    ([(('float',),), (('int',),)], ('bool',)),
-    ([(('float',),), (('float',),)], ('bool',)),
-    ([(('list', 'T'),), (('list', 'E'),)], ('bool',)),
-    ([(('set', 'T'),), (('set', 'E'),)], ('bool',)),
-    ([(('dict', 'T', 'E'),), (('dict', 'U', 'V'),)], ('bool',)),
+    (['bool', 'bool'], 'bool'),
+    (['bool', 'int'], 'bool'),
+    (['bool', 'float'], 'bool'),
+    (['int', 'bool'], 'bool'),
+    (['int', 'int'], 'bool'),
+    (['int', 'float'], 'bool'),
+    (['float', 'bool'], 'bool'),
+    (['float', 'int'], 'bool'),
+    (['float', 'float'], 'bool')
 ]
 
 TYPE_RULES = {
-    '=': [
-        ([('E',)], 'E')
-    ],
     '~': [
-        ([(('bool',),)], ('int',)),
-        ([(('int',),)], ('int',))
+        (['bool'], 'int'),
+        (['int'], 'int')
     ],
     '+': [
-        ([(('bool',),), (('bool',),)], ('int',)),
-        ([(('bool',),), (('int',),)], ('int',)),
-        ([(('bool',),), (('float',),)], ('float',)),
-        ([(('int',),), (('bool',),)], ('int',)),
-        ([(('int',),), (('int',),)], ('int',)),
-        ([(('int',),), (('float',),)], ('float',)),
-        ([(('float',),), (('bool',),)], ('float',)),
-        ([(('float',),), (('int',),)], ('float',)),
-        ([(('float',),), (('float',),)], ('float',)),
-        ([(('str',),), (('str',),)], ('str',)),
-        ([(('list', 'T'),), (('list', 'E'),)], ('list', ('$merge', 'T', 'E')))
+        (['bool', 'bool'], 'int'),
+        (['bool', 'int'], 'int'),
+        (['bool', 'float'], 'float'),
+        (['int', 'bool'], 'int'),
+        (['int', 'int'], 'int'),
+        (['int', 'float'], 'float'),
+        (['float', 'bool'], 'float'),
+        (['float', 'int'], 'float'),
+        (['float', 'float'], 'float'),
+        (['str', 'str'], 'str'),
     ],
     '-': [
-        ([(('bool',),), (('bool',),)], ('int',)),
-        ([(('bool',),), (('int',),)], ('int',)),
-        ([(('bool',),), (('float',),)], ('float',)),
-        ([(('int',),), (('bool',),)], ('int',)),
-        ([(('int',),), (('int',),)], ('int',)),
-        ([(('int',),), (('float',),)], ('float',)),
-        ([(('float',),), (('bool',),)], ('float',)),
-        ([(('float',),), (('int',),)], ('float',)),
-        ([(('float',),), (('float',),)], ('float',))
+        (['bool', 'bool'], 'int'),
+        (['bool', 'int'], 'int'),
+        (['bool', 'float'], 'float'),
+        (['int', 'bool'], 'int'),
+        (['int', 'int'], 'int'),
+        (['int', 'float'], 'float'),
+        (['float', 'bool'], 'float'),
+        (['float', 'int'], 'float'),
+        (['float', 'float'], 'float')
     ],
     '*': [
-        ([(('bool',),), (('bool',),)], ('int',)),
-        ([(('bool',),), (('int',),)], ('int',)),
-        ([(('bool',),), (('float',),)], ('float',)),
-        ([(('bool',),), (('str',),)], ('str',)),
-        ([(('bool',),), (('list', 'E'),)], ('list', 'E')),
-        ([(('int',),), (('bool',),)], ('int',)),
-        ([(('int',),), (('int',),)], ('int',)),
-        ([(('int',),), (('float',),)], ('float',)),
-        ([(('int',),), (('str',),)], ('str',)),
-        ([(('int',),), (('list', 'E'),)], ('list', 'E')),
-        ([(('float',),), (('bool',),)], ('float',)),
-        ([(('float',),), (('int',),)], ('float',)),
-        ([(('float',),), (('float',),)], ('float',)),
-        ([(('str',),), (('bool',),)], ('str',)),
-        ([(('list', 'E'),), (('bool',),)], ('list', 'E')),
-        ([(('str',),), (('int',),)], ('str',)),
-        ([(('list', 'E'),), (('int',),)], ('list', 'E'))
+        (['bool', 'bool'], 'int'),
+        (['bool', 'int'], 'int'),
+        (['bool', 'float'], 'float'),
+        (['bool', 'str'], 'str'),
+        (['int', 'bool'], 'int'),
+        (['int', 'int'], 'int'),
+        (['int', 'float'], 'float'),
+        (['int', 'str'], 'str'),
+        (['float', 'bool'], 'float'),
+        (['float', 'int'], 'float'),
+        (['float', 'float'], 'float'),
+        (['str', 'bool'], 'str'),
+        (['str', 'int'], 'str')
     ],
     '/': [
-        ([(('bool',),), (('bool',),)], ('float',)),
-        ([(('bool',),), (('int',),)], ('float',)),
-        ([(('bool',),), (('float',),)], ('float',)),
-        ([(('int',),), (('bool',),)], ('float',)),
-        ([(('int',),), (('int',),)], ('float',)),
-        ([(('int',),), (('float',),)], ('float',)),
-        ([(('float',),), (('bool',),)], ('float',)),
-        ([(('float',),), (('int',),)], ('float',)),
-        ([(('float',),), (('float',),)], ('float',))
+        (['bool', 'bool'], 'float'),
+        (['bool', 'int'], 'float'),
+        (['bool', 'float'], 'float'),
+        (['int', 'bool'], 'float'),
+        (['int', 'int'], 'float'),
+        (['int', 'float'], 'float'),
+        (['float', 'bool'], 'float'),
+        (['float', 'int'], 'float'),
+        (['float', 'float'], 'float')
     ],
     '%': [
-        ([(('bool',),), (('bool',),)], ('int',)),
-        ([(('bool',),), (('int',),)], ('int',)),
-        ([(('bool',),), (('float',),)], ('float',)),
-        ([(('int',),), (('bool',),)], ('int',)),
-        ([(('int',),), (('int',),)], ('int',)),
-        ([(('int',),), (('float',),)], ('float',)),
-        ([(('float',),), (('bool',),)], ('float',)),
-        ([(('float',),), (('int',),)], ('float',)),
-        ([(('float',),), (('float',),)], ('float',))
+        (['bool', 'bool'], 'int'),
+        (['bool', 'int'], 'int'),
+        (['bool', 'float'], 'float'),
+        (['int', 'bool'], 'int'),
+        (['int', 'int'], 'int'),
+        (['int', 'float'], 'float'),
+        (['float', 'bool'], 'float'),
+        (['float', 'int'], 'float'),
+        (['float', 'float'], 'float')
     ],
     '&': [
-        ([(('bool',),), (('bool',),)], ('bool',)),
-        ([(('bool',),), (('int',),)], ('int',)),
-        ([(('int',),), (('bool',),)], ('int',)),
-        ([(('int',),), (('int',),)], ('int',)),
+        (['bool', 'bool'], 'bool'),
+        (['bool', 'int'], 'int'),
+        (['int', 'bool'], 'int'),
+        (['int', 'int'], 'int'),
     ],
     '|': [
-        ([(('bool',),), (('bool',),)], ('bool',)),
-        ([(('bool',),), (('int',),)], ('int',)),
-        ([(('int',),), (('bool',),)], ('int',)),
-        ([(('int',),), (('int',),)], ('int',)),
+        (['bool', 'bool'], 'bool'),
+        (['bool', 'int'], 'int'),
+        (['int', 'bool'], 'int'),
+        (['int', 'int'], 'int'),
     ],
     '^': [
-        ([(('bool',),), (('bool',),)], ('bool',)),
-        ([(('bool',),), (('int',),)], ('int',)),
-        ([(('int',),), (('bool',),)], ('int',)),
-        ([(('int',),), (('int',),)], ('int',)),
+        (['bool', 'bool'], 'bool'),
+        (['bool', 'int'], 'int'),
+        (['int', 'bool'], 'int'),
+        (['int', 'int'], 'int'),
     ],
     '<<': [
-        ([(('bool',),), (('bool',),)], ('int',)),
-        ([(('bool',),), (('int',),)], ('int',)),
-        ([(('int',),), (('bool',),)], ('int',)),
-        ([(('int',),), (('int',),)], ('int',)),
+        (['bool', 'bool'], 'int'),
+        (['bool', 'int'], 'int'),
+        (['int', 'bool'], 'int'),
+        (['int', 'int'], 'int'),
     ],
     '>>': [
-        ([(('bool',),), (('bool',),)], ('int',)),
-        ([(('bool',),), (('int',),)], ('int',)),
-        ([(('int',),), (('bool',),)], ('int',)),
-        ([(('int',),), (('int',),)], ('int',)),
-    ],
-    '==': [
-        ([('T',), ('E',)], ('bool',)),
-    ],
-    '!=': [
-        ([('T',), ('E',)], ('bool',)),
+        (['bool', 'bool'], 'int'),
+        (['bool', 'int'], 'int'),
+        (['int', 'bool'], 'int'),
+        (['int', 'int'], 'int'),
     ],
     '>': REL_OP_RULES,
     '<': REL_OP_RULES,
     '<=': REL_OP_RULES,
     '>=': REL_OP_RULES,
     '__iter__': [
-        ([(('range',),)], ('range_iterator',)),
+        (['range'], 'range_iterator')
     ],
     '__next__': [
-        ([(('range_iterator',),)], ('int',)),
-    ],
-    '__setitem__': [
-        ([(('list', 'T'), ('list', ('$merge', 'T', 'E'))), (('int',),), ('E',)], ('none',)),
-        ([(('list', 'T'), ('list', ('$merge', 'T', 'E'))), (('slice',),), (('list', 'E'),)], ('none',)),
-        ([(('dict', 'K', 'V'), ('dict', ('$merge', 'K', 'T'), ('$merge', 'V', 'E'))), ('T',), ('E',)], ('none',)),
+        (['range_iterator'], 'int')
     ],
     '__getitem__': [
-        ([(('str',),), (('int',),)], ('str',)),
-        ([(('list', 'T'),), (('int',),)], 'T'),
-        ([(('list', 'T'),), (('slice',),)], ('list', 'T')),
-        ([(('dict', 'K', 'V'),), ('T',)], 'V'),
+        (['str', 'int'], 'str')
     ],
     '__len__': [
-        ([(('str',),)], ('int',)),
-        ([(('list', 'T'),)], ('int',)),
-        ([(('set', 'T'),)], ('int',)),
-        ([(('dict', 'T', 'E'),)], ('int',)),
+        (['str'], 'int')
     ],
     '__contains__': [
-        ([(('str',),), (('str',),)], ('bool',)),
-        ([(('list', 'T'),), ('E',)], ('bool',)),
-        ([(('set', 'T'),), ('E',)], ('bool',)),
-        ([(('dict', 'K', 'V'),), ('E',)], ('bool',)),
-    ],
-    '__delitem__': [
-        ([(('list', 'T'),), ('E',)], ('none',)),
-        ([(('dict', 'K', 'V'),), ('T',)], ('none',)),
-    ],
-    '__bool__': [
-        ([('T',)], ('bool',))
-    ],
-    'append': [
-        ([(('list', 'T'), ('list', ('$merge', 'T', 'E'))), 'E'], ('none',))
-    ],
-    'add': [
-        ([(('set', 'T'), ('set', ('$merge', 'T', 'E'))), 'E'], ('none',))
-    ],
-    'remove': [
-        ([(('set', 'T'),), ('E',)], ('none',)),
-    ],
-    'pop': [
-        ([(('set', 'T'),)], 'T'),
+        (['str', 'str'], 'bool')
     ],
     'range': [
-        ([(('int',),)], ('range',)),
-        ([(('int',),),(('int',),)], ('range',)),
-        ([(('int',),),(('int',),),(('int',),)], ('range',)),
+        (['int'], 'range'),
+        (['int','int'], 'range'),
+        (['int','int','int'], 'range'),
     ],
+    'slice': [
+        (['int'], 'slice'),
+        (['int','int'], 'slice'),
+        (['int','int','int'], 'slice'),
+    ]
 }
 
+SIMPLE_NODES = ['none', 'bool', 'int', 'float', 'str', 'range', 'range_iterator', 'slice']
+
 def type_inference(src):
-    states, states_out = analyzer.analyze_forward(src, merge, step, {}, {})
+    states, states_out = analyzer.analyze_forward(src, merge, step, ({},{}), ({},{}))
     
     def add_type(v, state):
+        symbols, nodes = state
         if v[0] == 'symbol':
-            return ('symbol', v[1], state[v[1]])
+            infered = set()
+            for node_name in symbols[v[1]]:
+                if node_name in SIMPLE_NODES:
+                    infered.add(node_name)
+                elif 'list_values' in nodes[node_name]:
+                    infered.add('list')
+                elif 'set_values' in nodes[node_name]:
+                    infered.add('set')
+                elif 'dict_values' in nodes[node_name]:
+                    infered.add('dict')
+                elif 'list_iterator_owners' in nodes[node_name]:
+                    infered.add('list_iterator')
+                elif 'set_iterator_owners' in nodes[node_name]:
+                    infered.add('set_iterator')
+                elif 'dict_iterator_owners' in nodes[node_name]:
+                    infered.add('dict_iterator')
+            return ('symbol', v[1], infered)
         if v[0] == 'constant':
-            return ('constant', v[1], constant_type(v[1]))
+            return ('constant', v[1], {constant_type(v[1])})
         raise Exception("Unknown value: " + str(v))
     
     for i in range(len(src)):
@@ -218,150 +193,241 @@ def type_inference(src):
     return src
 
 def merge(states):
-    variables = set()
-    for s in states:
-        variables.update(s.keys())
+    new_symbols = dict()
+    new_nodes = dict()
+    for (symbols, nodes) in states:
+        for sym_name in symbols:
+            if sym_name not in new_symbols:
+                new_symbols[sym_name] = set()
+            new_symbols[sym_name] |= symbols[sym_name]
+        
+        for node_name in nodes:
+            node = nodes[node_name]
+            if node_name not in new_nodes:
+                new_node = dict()
+                for col_name in node.keys():
+                    new_node[col_name] = set()
+                new_nodes[node_name] = new_node
+            else:
+                new_node = new_nodes[node_name]
+            
+            for col_name in node:
+                new_node[col_name] |= node[col_name]
     
-    ret = dict()
-    for var in variables:
-        the_type = ('any',)
-        for s in states:
-            the_type = merge_type(the_type, s.get(var, ('dynamic',)))
-        ret[var] = the_type
-    return ret
+    return (new_symbols, new_nodes)
 
-def step(old, code):
+def step(old, code, line_num):
     if code[0] in ['if','ifnot','jmp']:
         return old
     
-    def get_type(v):
-        if v[0] == 'symbol':
-            return old.get(v[1], ('any',))
-        if v[0] == 'constant':
-            return constant_type(v[1])
-        raise Exception('Unknown value: ' + str(v))
+    def get_nodes(value, new_name):
+        if value[0] == 'symbol':
+            return old[0].get(value[1], set())
+        if value[0] == 'constant':
+            c = value[1]
+            if type(c) == type(None):
+                return {'none'}
+            if type(c) == bool:
+                return {'bool'}
+            if type(c) == int:
+                return {'int'}
+            if type(c) == float:
+                return {'float'}
+            if type(c) == str:
+                return {'str'}
+            if c == []:
+                if new_name not in new[1]:
+                    new[1][new_name] = {'list_values': set()}
+                return {new_name}
+            if c == set():
+                if new_name not in new[1]:
+                    new[1][new_name] = {'set_values': set()}
+                return {new_name}
+            if c == {}:
+                if new_name not in new[1]:
+                    new[1][new_name] = {'dict_keys': set(), 'dict_values': set()}
+                return {new_name}
+        raise Exception('Unknown value: ' + str(value))
     
-    def set_type(v, t):
-        if v[0] == 'symbol':
-            new[v[1]] = t
-    
-    new = copy.copy(old)
+    new = merge([old]) # copy the state
+    new_name = str(line_num)
     if code[0] in UNARY_OPERATORS:
-        infered = infer_type(code[0], [get_type(code[2])])
-        set_type(code[2], infered[0])
-        set_type(code[1], infered[1])
-    elif code[0] in BINARY_OPERATORS:
-        infered = infer_type(code[0], [get_type(code[2]), get_type(code[3])])
-        set_type(code[2], infered[0])
-        set_type(code[3], infered[1])
-        set_type(code[1], infered[2])
-    elif code[0] == 'call':
-        infered = infer_type(code[2], [get_type(arg) for arg in code[3]])
+        return infer_type(code[0], code[1][1], [get_nodes(code[2], new_name + '.1')], new, new_name)
+    if code[0] in BINARY_OPERATORS:
+        return infer_type(code[0], code[1][1], [get_nodes(code[2], new_name + '.1'), get_nodes(code[3], new_name + '.2')], new, new_name)
+    if code[0] == 'call':
+        args = []
         for i in range(len(code[3])):
-            set_type(code[3][i], infered[i])
-        if code[1] is not None:
-            set_type(code[1], infered[len(code[3])])
-    else:
-        raise Exception('Unknown op: ' + code[0])
-    return new
+            args.append(get_nodes(code[3][i], new_name + '.' + str(i + 1)))
+        target = code[1][1] if code[1] else None
+        return infer_type(code[2], target, args, new, new_name)
+    raise Exception('Unknown op: ' + code[0])
 
-def infer_type(fn, args):
-    for arg in args:
-        if arg[0] == 'any':
-            raise Exception('Use before assignment')
+def infer_type(fn, target, args, state, new_name):
+    def all_has(node_names, col_name):
+        ret = set()
+        for node_name in node_names:
+            if node_name not in SIMPLE_NODES and col_name in nodes[node_name]:
+                ret.add(node_name)
+        return ret
     
-    rules = TYPE_RULES[fn]
-    infered = [('any',) for i in range(len(args) + 1)]
-    matched = False
-    for rule in rules:
-        arg_tpl = rule[0]
-        ret_tpl = rule[1]
-        if len(arg_tpl) != len(args):
-            continue
-        
-        params = {}
-        all_matched = True
-        for i in range(len(args)):
-            arg_before = arg_tpl[i][0]
-            if not pattern_match(arg_before, args[i], params):
-                all_matched = False
-                break
-        if not all_matched:
-            continue
-        
-        matched = True
-        ret_type = pattern_apply(ret_tpl, params)
-        infered[len(args)] = merge_type(infered[len(args)], ret_type)
-        for i in range(len(args)):
-            arg_after = arg_tpl[i][1] if len(arg_tpl[i]) == 2 else arg_tpl[i][0]
-            arg_type = pattern_apply(arg_after, params)
-            infered[i] = merge_type(infered[i], arg_type)
+    def chain(node_names, *col_names):
+        for col_name in col_names:
+            next_node_names = set()
+            for node_name in node_names:
+                if node_name not in SIMPLE_NODES and col_name in nodes[node_name]:
+                    next_node_names.update(nodes[node_name][col_name])
+            node_names = next_node_names
+        return node_names
     
-    if not matched:
-        raise Exception('Type error for ' + fn + ' args: ' + str(args))
-    return infered
-
-def merge_type(ta, tb):
-    if ta[0] == 'dynamic' or tb[0] == 'dynamic':
-        return ta
-    if ta[0] == 'any':
-        return tb
-    if tb[0] == 'any':
-        return ta
-    if ta[0] != tb[0]:
-        return ('dynamic',)
-    if ta[0] in ['none','bool','int','float','str','range','range_iterator','slice']:
-        return ta
-    if ta[0] in ['list', 'set']:
-        return (ta[0], merge_type(ta[1],tb[1]))
-    if ta[0] == 'dict':
-        return ('dict', merge_type(ta[1], tb[1]), merge_type(ta[2], tb[2]))
-    raise Exception('Unknown type: ' + ta[0])
+    symbols, nodes = state
+    ret_nodes = set()
+    if fn in TYPE_RULES:
+        rules = TYPE_RULES[fn]
+        for (rule_args, rule_ret) in rules:
+            if len(rule_args) != len(args):
+                continue
+            for i in range(len(rule_args)):
+                if rule_args[i] not in args[i]:
+                    break
+            else:
+                ret_nodes.add(rule_ret)
+    
+    if fn == '=':
+        ret_nodes = args[0]
+    elif fn == '+':
+        llists = all_has(args[0], 'list_values')
+        rlists = all_has(args[1], 'list_values')
+        if llists and rlists:
+            list_elems = chain(llists, 'list_values') | chain(rlists, 'list_values')
+            add_node(new_name + '.list', {'list_values': list_elems})
+            ret_nodes.add(new_name + '.list')
+    elif fn == '*':
+        if 'bool' in args[0] or 'int' in args[0]:
+            rlists = all_has(args[1], 'list_values')
+            if rlists:
+                add_node(new_name + '.list', {'list_values': chain(rlists, 'list_values')})
+                ret_nodes.add(new_name + '.list')
+        if 'bool' in args[1] or 'int' in args[1]:
+            llists = all_has(args[0], 'list_values')
+            if llists:
+                add_node(new_name + '.list', {'list_values': chain(llists, 'list_values')})
+                ret_nodes.add(new_name + '.list')
+    elif fn in ['==', '!=']:
+        ret_nodes.add('bool')
+    elif fn in ['<', '>', '<=', '>=']:
+        if all_has(args[0], 'list_values') and all_has(args[1], 'list_values'):
+            ret_nodes.add('bool')
+        if all_has(args[0], 'set_values') and all_has(args[1], 'set_values'):
+            ret_nodes.add('bool')
+    elif fn == '__iter__':
+        list_iterator_owners = all_has(args[0], 'list_values')
+        set_iterator_owners = all_has(args[0], 'set_values')
+        dict_iterator_owners = all_has(args[0], 'dict_values')
+        
+        if list_iterator_owners:
+            add_node(new_name + '.list_iterator', {'list_iterator_owners': list_iterator_owners})
+            ret_nodes.add(new_name + '.list_iterator')
+        if set_iterator_owners:
+            add_node(new_name + '.set_iterator', {'set_iterator_owners': set_iterator_owners})
+            ret_nodes.add(new_name + '.set_iterator')
+        if dict_iterator_owners:
+            add_node(new_name + '.dict_iterator', {'dict_iterator_owners': dict_iterator_owners})
+            ret_nodes.add(new_name + '.dict_iterator')
+    elif fn == '__next__':
+        ret_nodes.update(chain(args[0], 'list_iterator_owners', 'list_values'))
+        ret_nodes.update(chain(args[0], 'set_iterator_owners', 'set_values'))
+        ret_nodes.update(chain(args[0], 'dict_iterator_owners', 'dict_keys'))
+    elif fn == '__setitem__':
+        lists = all_has(args[0], 'list_values')
+        if lists and 'int' in args[1]:
+            for node_name in lists:
+                nodes[node_name]['list_values'] |= args[2]
+            ret_nodes.add('none')
+                
+        vlists = all_has(args[2], 'list_values')
+        if lists and 'slice' in args[1] and vlists:
+            vlist_values = chain(vlists, 'list_values')
+            for node_name in lists:
+                nodes[node_name]['list_values'] |= vlist_values
+            ret_nodes.add('none')
+        
+        dicts = all_has(args[0], 'dict_values')
+        if dicts:
+            for node_name in dicts:
+                nodes[node_name]['dict_keys'] |= args[1]
+                nodes[node_name]['dict_values'] |= args[2]
+            ret_nodes.add('none')
+    elif fn == '__getitem__':
+        lists = all_has(args[0], 'list_values')
+        if 'int' in args[1] and lists:
+            ret_nodes.update(chain(lists, 'list_values'))
+        if 'slice' in args[1] and lists:
+            add_node(new_name + '.list', {'list_values': chain(lists, 'list_values')})
+            ret_nodes.add(new_name + '.list')
+        ret_nodes.update(chain(args[0], 'dict_values'))
+    elif fn == '__len__':
+        if all_has(args[0], 'list_values') or all_has(args[0], 'set_values') or all_has(args[0], 'dict_values'):
+            ret_nodes.add('int')
+    elif fn == '__contains__':
+        if all_has(args[0], 'list_values') or all_has(args[0], 'set_values') or all_has(args[0], 'dict_values'):
+            ret_nodes.add('bool')
+    elif fn == '__delitem__':
+        if all_has(args[0], 'list_values') and 'int' in args[1] or all_has(args[0], 'dict_values'):
+            ret_nodes.add('none')
+    elif fn == '__bool__':
+        ret_nodes.add('bool')
+    elif fn == 'append':
+        lists = all_has(args[0], 'list_values')
+        if lists:
+            for node_name in lists:
+                nodes[node_name]['list_values'] |= args[1]
+            ret_nodes.add('none')
+    elif fn == 'add':
+        sets = all_has(args[0], 'set_values')
+        if sets:
+            for node_name in sets:
+                nodes[node_name]['set_values'] |= args[1]
+            ret_nodes.add('none')
+    elif fn == 'remove':
+        if all_has(args[0], 'set_values'):
+            ret_nodes.add('none')
+    elif fn == 'pop':
+        ret_nodes.update(chain(args[0], 'set_values'))
+    elif fn == 'print':
+        ret_nodes.add('none')
+    
+    if target:
+        symbols[target] = ret_nodes
+    return state
 
 def constant_type(c):
     if type(c) == type(None):
-        return ('none',)
+        return 'none'
     if type(c) == bool:
-        return ('bool',)
+        return 'bool'
     if type(c) == int:
-        return ('int',)
+        return 'int'
     if type(c) == float:
-        return ('float',)
+        return 'float'
     if type(c) == str:
-        return ('str',)
+        return 'str'
     if c == []:
-        return ('list', ('any',))
+        return 'list'
     if c == set():
-        return ('set', ('any',))
+        return 'set'
     if c == {}:
-        return ('dict', ('any',), ('any',))
+        return 'dict'
     raise Exception('Unknown constant: ' + str(c))
 
-def pattern_match(template, value, params):
-    #print('pattern_match', template, value)
-    if type(template) == str:
-        params[template] = value
-        return True
-    if value[0] == 'dynamic':
-        for i in range(1, len(template)):
-            assert pattern_match(template[i], ('dynamic',), params)
-        return True
-    if len(template) != len(value) or template[0] != value[0]:
-        return False
-    for i in range(1, len(template)):
-        if not pattern_match(template[i], value[i], params):
-            return False
-    return True
-
-def pattern_apply(template, params):
-    if type(template) == str:
-        return params[template]
-    if template[0] == '$merge':
-        return merge_type(pattern_apply(template[1], params), pattern_apply(template[2], params))
-    ret = [template[0]]
-    for i in range(1, len(template)):
-        ret.append(pattern_apply(template[i], params))
-    return tuple(ret)
+def print_state(state):
+    symbols, nodes = state
+    print('Symbols:')
+    for sym in symbols:
+        print('\t', sym, ':', symbols[sym])
+    print('Nodes:')
+    for node in nodes:
+        print('\t', node, ':', nodes[node])
 
 if __name__ == '__main__':
     print(infer_type('+', [('list', ('int',)), ('list', ('any',))]))

@@ -16,7 +16,7 @@ def analyze_forward(src, merge_func, step_func, init_state, empty_state):
     """Forward analyzing
     merge_func: ([states]) -> state
         Must not change states
-    step_func: (state_old, code) -> state_new
+    step_func: (state_old, code, line_no) -> state_new
         Must not change state_old
     init_state: the state before the whole program
     empty_state
@@ -36,7 +36,7 @@ def analyze_forward(src, merge_func, step_func, init_state, empty_state):
                 succ[i].append(src[i][2])
             if not must_take(src[i]):
                 pre[i+1].append(i)
-                succ[i] = [i+1]
+                succ[i].append(i+1)
         else:
             pre[i+1].append(i)
             succ[i] = [i+1]
@@ -58,7 +58,7 @@ def analyze_forward(src, merge_func, step_func, init_state, empty_state):
         else:
             state_in[line] = merge_func(from_states)
         
-        new_state = step_func(state_in[line], src[line])
+        new_state = step_func(state_in[line], src[line], line)
         if new_state == state_out[line]:
             continue
         state_out[line] = new_state
@@ -71,7 +71,7 @@ def analyze_backward(src, merge_func, step_func, empty_state):
     """Backward analyzing
     merge_func: ([states]) -> state
         Must not change states
-    step_func: (state_old, code) -> state_new
+    step_func: (state_old, code, line_no) -> state_new
         Must not change state_old
     empty_state
     """
@@ -90,7 +90,7 @@ def analyze_backward(src, merge_func, step_func, empty_state):
                 succ[i].append(src[i][2])
             if not must_take(src[i]):
                 pre[i+1].append(i)
-                succ[i] = [i+1]
+                succ[i].append(i + 1)
         else:
             pre[i+1].append(i)
             succ[i] = [i+1]
@@ -107,7 +107,7 @@ def analyze_backward(src, merge_func, step_func, empty_state):
         else:
             state_in[line] = merge_func(from_states)
         
-        new_state = step_func(state_in[line], src[line])
+        new_state = step_func(state_in[line], src[line], line)
         if new_state == state_out[line]:
             continue
         state_out[line] = new_state

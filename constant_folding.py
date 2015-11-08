@@ -13,7 +13,7 @@ def merge(states):
             ret[k] = states[0][k]
     return ret
 
-def step(old, code):
+def step(old, code, line_num):
     if code[0] in ['jmp','if','ifnot']:
         return old
     
@@ -21,7 +21,10 @@ def step(old, code):
     
     def get_value(v):
         if v[0] == 'constant':
-            return (True, v[1])
+            if type(v[1]) in [type(None), bool, int, float, str]:
+                return (True, v[1])
+            else:
+                return (False, None)
         elif v[0] == 'symbol':
             if v[1] in old:
                 return (True, old[v[1]])
@@ -112,10 +115,7 @@ def constant_folding(src):
         elif code[0] == 'call':
             for j in range(len(code[3])):
                 if code[3][j][0] == 'symbol' and code[3][j][1] in state[i]:
-                    c = state[i][code[3][j][1]]
-                    # Must not be used as left value
-                    if type(c) in [type(None), bool, int, float, str]:
-                        code[3][j] = ('constant', c)
+                    code[3][j] = ('constant', state[i][code[3][j][1]])
         elif code[0] in ['if', 'ifnot']:
             if code[1][0] == 'symbol' and code[1][1] in state[i]:
                 code[1] = ('constant', state[i][code[1][1]])

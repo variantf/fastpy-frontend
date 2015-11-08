@@ -4,7 +4,7 @@ from optimizer import remove_lines
 def dead_code(src):
     def merge(states):
         return any(states)
-    def step(old_state,code):
+    def step(old_state,code,line_num):
         return old_state
     
     (state, state_out) = analyzer.analyze_forward(src, merge, step, True, False)

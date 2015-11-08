@@ -9,7 +9,7 @@ def merge(states):
         merged.update(s)
     return merged
 
-def step(state, code):
+def step(state, code, line_num):
     new = copy.copy(state)
     if code[0] in BINARY_OPERATORS:
         if code[1][1] in new:
