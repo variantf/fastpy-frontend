@@ -11,7 +11,8 @@ class symbol_table:
 		'append': 'append',
 		'range': 'range',
 		'slice': 'slice',
-		'print': 'print'
+		'print': 'print',
+		'next': '__next__'
 	}]
 	def push_sym_tb(self):
 		self.sym_tb_stack.append({})
@@ -371,17 +372,12 @@ def gen_dfs(node):
 		raise Exception('Unknown node type ' + str(type(node)))
 
 
-f = open('py_code.py', 'r')
-code = ''.join(f.readlines())
-node = ast.parse(code)
-#print(ast.dump(node))
-gen_dfs(node)
-
-f = open('triple_code', 'w')
-for line in triple_code_lines:
-	print(line)
-	print(line, file = f)
-f.close()
+def parser_main(filename):
+	f = open(filename, 'r')
+	code = ''.join(f.readlines())
+	node = ast.parse(code)
+	gen_dfs(node)
+	return triple_code_lines
 
 
 

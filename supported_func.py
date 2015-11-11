@@ -110,10 +110,10 @@ supported_functions = {
 	'__bool__$none',
 	'__eq__$none$none',
 	'__ne__$none$none',
-	'__init__$range$int_',
-	'__init__$range$int_$int_$int_',
+	'range$int_',
+	'range$int_$int_',
+	'range$int_$int_$int_',
 	'__iter__$range',
-	'make$range_iterator',
 	'__next__$range_iterator',
 	'make$set',
 	'add$set$',
@@ -130,8 +130,9 @@ supported_functions = {
 	'__iter__$set',
 	'make$set_iterator',
 	'__next__$set_iterator',
-	'__init__$slice$int_',
-	'__init__$slice$int_$int_$int_',
+	'slice$int_',
+	'slice$int_$int_',
+	'slice$int_$int_$int_',
 	'make$str',
 	'__getitem__$str$',
 	'__getitem__$str$int_',
@@ -146,7 +147,8 @@ supported_functions = {
 	'__ge__$str$str',
 	'__gt__$str$str',
 	'__contains__$str$str',
-	'__bool__$str'
+	'__bool__$str',
+	'print'
 }
 
 binary_func_mapper = {
