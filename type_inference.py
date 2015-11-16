@@ -280,6 +280,14 @@ def infer_type(fn, target, args, state, new_name):
             node_names = next_node_names
         return node_names
     
+    def add_node(new_name, params):
+        if new_name in nodes:
+            node = nodes[new_name]
+            for col in params:
+                node[col] |= params[col]
+        else:
+            nodes[new_name] = params
+    
     symbols, nodes = state
     ret_nodes = set()
     if fn in TYPE_RULES:
