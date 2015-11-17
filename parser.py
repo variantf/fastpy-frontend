@@ -310,9 +310,15 @@ def gen_dfs(node):
 			gen_code_triple('jmp', test_idx)
 			modify_target_for_currentIdx(ed_idx)
 		return tmp_dict_name
+	elif type(node) is ast.Index:
+		return gen_dfs(node.value)
+	elif type(node) is ast.Slice:
+		tmp_name = gen_name()
+		gen_code_triple('call', tmp_name, 'slice', [gen_dfs(node.lower), gen_dfs(node.upper), gen_dfs(node.step)])
+		return tmp_name
 	elif type(node) is ast.Subscript:
 		name = gen_dfs(node.value)
-		sub = gen_dfs(node.slice.value)
+		sub = gen_dfs(node.slice)
 		if type(node.ctx) is ast.Load:
 			tmp_name = gen_name()
 			gen_code_triple('call', tmp_name, '__getitem__', [name, sub])
