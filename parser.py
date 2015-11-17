@@ -12,6 +12,9 @@ class symbol_table:
 		'range': 'range',
 		'slice': 'slice',
 		'print': 'print',
+		'remove': 'remove',
+		'add': 'add',
+		'pop': 'pop',
 		'next': '__next__'
 	}]
 	def push_sym_tb(self):
@@ -143,7 +146,10 @@ def gen_dfs(node):
 			return ('symbol', sym_tb.get_symbol(node.id))
 		elif type(ctx) is ast.Store:
 			return ('symbol', sym_tb.get_symbol(node.id, True))
-		raise Exception('Unknown ctx for Name')
+		elif type(ctx) is ast.Del:
+			gen_code_triple('call', None, '__delitem__', [sym_tb.get_symbol(node.id)])
+		else:
+			raise Exception('Unknown ctx for Name')
 	elif type(node) is ast.Assign:
 		source_name = gen_dfs(node.value)
 		for target in node.targets:
@@ -249,6 +255,8 @@ def gen_dfs(node):
 				gen_code_triple('!=', tmp_name, left, right)
 			elif type(op) is ast.Is:
 				gen_code_triple('is', tmp_name, left, right)
+			elif type(op) is ast.In:
+				gen_code_triple('call', tmp_name, '__contains__', [right, left])
 			else:
 				raise Exception('Unhandled Compare operators')
 			left = right
@@ -314,7 +322,14 @@ def gen_dfs(node):
 		return gen_dfs(node.value)
 	elif type(node) is ast.Slice:
 		tmp_name = gen_name()
-		gen_code_triple('call', tmp_name, 'slice', [gen_dfs(node.lower), gen_dfs(node.upper), gen_dfs(node.step)])
+		if node.lower:
+			if node.step:
+				paras = [gen_dfs(node.lower), gen_dfs(node.upper), gen_dfs(node.step)]
+			else:
+				paras = [gen_dfs(node.lower), gen_dfs(node.upper)]
+		else:
+			paras = [gen_dfs(node.upper)]
+		gen_code_triple('call', tmp_name, 'slice', paras)
 		return tmp_name
 	elif type(node) is ast.Subscript:
 		name = gen_dfs(node.value)
@@ -325,8 +340,13 @@ def gen_dfs(node):
 			return tmp_name
 		elif type(node.ctx) is ast.Store:
 			return (name, sub)
+		elif type(node.ctx) is ast.Del:
+			gen_code_triple('call', None, '__delitem__', [name, sub])
 		else:
 			raise Exception('Unknown ctx type')
+	elif type(node) is ast.Delete:
+		for item in node.targets:
+			gen_dfs(item)
 	elif type(node) is ast.While:
 		start_idx = get_currentIdx()
 		continue_stack.append(start_idx)
