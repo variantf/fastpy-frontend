@@ -1,40 +1,8 @@
 from supported_func import supported_functions, binary_func_mapper
 import optimizer
 
-cpp_code = []
-symbols = set()
-
-def cpp_export(filename):
-    header = """
-#include "type.h"
-#include "list.h"
-#include "int.h"
-#include "float.h"
-#include "str.h"
-#include "dict.h"
-#include "bool.h"
-#include "set.h"
-#include "func.h"
-#include "none.h"
-#include "range.h"
-#include "range_iterator.h"
-#include "dict_iterator.h"
-#include "set_iterator.h"
-#include "list_iterator.h"
-#include "slice.h"
-"""
-    f = open(filename, 'w')
-    print(header, file=f)
-    print('int main(){', file=f)
-    for s in symbols:
-        print('\tvalue '+s+';', file=f)
-    for line in cpp_code:
-        print('\t'+line, file=f)
-    print('}', file=f)
-
 def sym_cpp(id):
     if id[0] == 'symbol':
-        symbols.add(id[1])
         return id[1]
     elif id[0] == 'constant':
         if type(id[1]) == type(None):
@@ -62,7 +30,40 @@ def func_cpp(name, args):
             return candinate_name
     raise Exception('Cannot find func ' + name)
 
-def cpp_generator(lines, tofile):
+def cpp_generator(source, tofile):
+    header = """
+#include "type.h"
+#include "list.h"
+#include "int.h"
+#include "float.h"
+#include "str.h"
+#include "dict.h"
+#include "bool.h"
+#include "set.h"
+#include "func.h"
+#include "none.h"
+#include "range.h"
+#include "range_iterator.h"
+#include "dict_iterator.h"
+#include "set_iterator.h"
+#include "slice.h"
+"""
+    f = open(tofile, 'w')
+    print(header, file = f)
+    main = source['_main$']
+    if main['vars']:
+        print('value ', end='', file = f)
+        for var in main['vars']:
+            print(' %s' % var, end='', file = f)
+        print(';', file = f)
+    for func_name in source:
+        code_lines = code_generator(source[func_name]['code'])
+        print('value %s(%s) {\n%s\n}' % ('main' if func_name == '_main$' else func_name, ','.join(source[func_name]['vars']), '\n'.join(code_lines)))
+    f.close()
+
+
+def code_generator(lines):
+    cpp_code = []
     jmp_targets = set()
     for code_tuple in lines:
         if code_tuple[0] == '=':
@@ -97,7 +98,5 @@ def cpp_generator(lines, tofile):
         cpp_code[i] = cpp_code[i] + ';'
     if len(cpp_code) in jmp_targets:
         cpp_code.append('L%s:;' % len(cpp_code))
-    if tofile:
-        cpp_export(tofile)
     return cpp_code
 
