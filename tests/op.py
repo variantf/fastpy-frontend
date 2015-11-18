@@ -48,3 +48,12 @@ for i in d:
     print(i)
     print(d[i])
     print('\n')
+
+del d[1]
+del d,i
+d = l[1:2]
+d = l[1:]
+s = set()
+s.add(1)
+s.remove(1)
+s.pop()

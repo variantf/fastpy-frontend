@@ -10,16 +10,16 @@ from jump_next import jump_next
 from cpp_generator import cpp_generator
 
 if len(sys.argv) >= 3:
-    src = parser_main(sys.argv[1])
-    #for l in src:
-    #    print(l)
-    #exit(1)
-    #src = constant_folding(src)
-    src = dead_code(src)
-    src = unused_variable(src)
-    src = successive_jump(src)
-    src = jump_next(src)
-    src = type_inference(src)
+    funcs = parser_main(sys.argv[1])
+    for func in funcs:
+        src = funcs[func]['code']
+        src = constant_folding(src)
+        src = dead_code(src)
+        src = unused_variable(src)
+        src = successive_jump(src)
+        src = jump_next(src)
+        src = type_inference(src)
+        funcs[func]['code'] = src
     cpp_generator(src, sys.argv[2])
 else:
     print("Usage: main.py from.py to.cpp")

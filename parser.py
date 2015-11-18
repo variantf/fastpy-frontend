@@ -3,54 +3,13 @@ import ast
 import random
 import optimizer
 
-triple_code_lines = []
 
-class symbol_table:
-    sym_tb_stack = [{
-        'iter': '__iter__',
-        'len': '__len__',
-        'append': 'append',
-        'range': 'range',
-        'slice': 'slice',
-        'print': 'print',
-        'remove': 'remove',
-        'add': 'add',
-        'pop': 'pop',
-        'next': '__next__'
-    }]
-    def push_sym_tb(self):
-        self.sym_tb_stack.append({})
+code_slice = {}
 
-    def pop_sym_tb(self):
-        self.sym_tb_stack.pop()
-
-    def add_symbol(self, key, value = None):
-        if None == value:
-            value = key
-        sym_tb_now = self.sym_tb_stack[len(self.sym_tb_stack) - 1]
-        if key in sym_tb_now:
-            raise Exception('key has already defined')
-        sym_tb_now[key] = value
-
-    def get_symbol(self, key, add = False):
-        last_idx = len(self.sym_tb_stack) - 1
-        if add:
-            if key in self.sym_tb_stack[last_idx]:
-                return self.sym_tb_stack[last_idx][key]
-            else:
-                self.sym_tb_stack[last_idx][key] = key
-                return key
-        else:
-            for i in range(len(self.sym_tb_stack)-1, -1, -1):
-                if key in self.sym_tb_stack[i]:
-                    return self.sym_tb_stack[i][key]
-            raise Exception('can not find symbol: ' + key)
-
-sym_tb = symbol_table()
-
-
-def gen_code_triple(code_type, a, b = None, c = None, target = triple_code_lines):
-    if code_type in ['jmp']:
+def gen_code_triple(code_type, a, b = None, c = None, target = None):
+    if not target:
+        target = code_slice[current_func]['code']
+    if code_type in ['jmp', 'return']:
         target.append((code_type, a))
     elif code_type in optimizer.BINARY_OPERATORS:
         target.append((code_type, a, b, c))
@@ -64,7 +23,9 @@ def gen_code_triple(code_type, a, b = None, c = None, target = triple_code_lines
         raise Exception('Unknown instruction: ' + code_type)
     return len(target) - 1
 
-def modify_target_for_currentIdx(idx, target = triple_code_lines):
+def modify_target_for_currentIdx(idx, target = None):
+    if not target:
+        target = code_slice[current_func]['code']
     if target[idx][0] == 'if':
         target[idx] = ('if', target[idx][1], len(target))
     elif target[idx][0] == 'ifnot':
@@ -75,11 +36,21 @@ def modify_target_for_currentIdx(idx, target = triple_code_lines):
         print(target[idx])
         raise Exception('Unknown code type')
 
-def modify_target(idx, val, target = triple_code_lines):
+def modify_target(idx, val, target = None):
+    if not target:
+        target = code_slice[current_func]['code']
     target[idx] = (target[item][i] if 1 != i else val for i in range(len(target[idx])))
 
-def get_currentIdx(target = triple_code_lines):
+def get_currentIdx(target = None):
+    if not target:
+        target = code_slice[current_func]['code']
     return len(target)
+
+def add_symbol(name, target = None):
+    if not target:
+        target = code_slice[current_func]['vars']
+    if not name in target and not name in code_slice['_main$']['vars']:
+        target.add(name)
 
 name_id = 0
 
@@ -88,20 +59,36 @@ def gen_name(n=5):
     global name_id
     name_id = name_id + 1
     name = '_' + str(name_id) + '$'
-    sym_tb.add_symbol(name)
+    add_symbol(name)
     return ('symbol', name)
 
 continue_stack = []
 break_stack = []
 
 def gen_dfs(node):
-    if type(node) is ast.Module:
-        sym_tb.push_sym_tb()
+    global current_func
+    if type(node) is ast.FunctionDef:
+        code_slice[node.name] = {'code': [], 'vars': set(), 'paras': []}
+        last_func = current_func
+        current_func = node.name
+        for arg in node.args.args:
+            code_slice[current_func]['paras'].append(arg)
+        for stmt in node.body:
+            gen_dfs(stmt)
+        current_func = last_func
+    elif type(node) is ast.Return:
+        gen_code_triple('return', gen_dfs(node.value))
+    elif type(node) is ast.Global:
+        for name in node.names:
+            code_slice['_main$']['vars'].add(name)
+            code_slice[current_func]['vars'].discard(name)
+    elif type(node) is ast.Module:
+        current_func = '_main$'
+        code_slice[current_func] = {'code': [], 'vars': set()}
         body = node.body
         for stmt in body:
             gen_dfs(stmt)
-        sym_tb.pop_sym_tb()
-        return
+        current_func = None
     elif type(node) is ast.NameConstant:
         return ('constant', node.value)
     elif type(node) is ast.For:
@@ -124,7 +111,7 @@ def gen_dfs(node):
 
         for stmt in node.orelse:
             gen_dfs(stmt)
-            
+
         brk = break_stack.pop()
         for line in brk:
             modify_target_for_currentIdx(line)
@@ -137,18 +124,19 @@ def gen_dfs(node):
     elif type(node) is ast.Call:
         tmp_name = gen_name()
         if type(node.func) is ast.Name:
-            gen_code_triple('call', tmp_name, sym_tb.get_symbol(node.func.id), [gen_dfs(arg) for arg in node.args])
+            gen_code_triple('call', tmp_name, func.id, [gen_dfs(arg) for arg in node.args])
         elif type(node.func) is ast.Attribute:
-            gen_code_triple('call', tmp_name, sym_tb.get_symbol(node.func.attr), [gen_dfs(node.func.value)] + [gen_dfs(arg) for arg in node.args])
+            gen_code_triple('call', tmp_name, node.func.attr, [gen_dfs(node.func.value)] + [gen_dfs(arg) for arg in node.args])
         return tmp_name
     elif type(node) is ast.Name:
         ctx = node.ctx
         if type(ctx) is ast.Load:
-            return ('symbol', sym_tb.get_symbol(node.id))
+            return ('symbol', node.id)
         elif type(ctx) is ast.Store:
-            return ('symbol', sym_tb.get_symbol(node.id, True))
+            add_symbol(node.id)
+            return ('symbol', node.id)
         elif type(ctx) is ast.Del:
-            gen_code_triple('call', None, '__delitem__', [sym_tb.get_symbol(node.id)])
+            gen_code_triple('call', None, '__delitem__', [('symbol', node.id)])
         else:
             raise Exception('Unknown ctx for Name')
     elif type(node) is ast.Assign:
@@ -323,13 +311,13 @@ def gen_dfs(node):
         return gen_dfs(node.value)
     elif type(node) is ast.Slice:
         tmp_name = gen_name()
+        paras = [('constant', None), ('constant', None), ('constant', None)]
         if node.lower:
-            if node.step:
-                paras = [gen_dfs(node.lower), gen_dfs(node.upper), gen_dfs(node.step)]
-            else:
-                paras = [gen_dfs(node.lower), gen_dfs(node.upper)]
-        else:
-            paras = [gen_dfs(node.upper)]
+            paras[0] = gen_dfs(node.lower)
+        if node.upper:
+            paras[1] = gen_dfs(node.upper)
+        if node.step:
+            paras[2] = gen_dfs(node.step)
         gen_code_triple('call', tmp_name, 'slice', paras)
         return tmp_name
     elif type(node) is ast.Subscript:
@@ -403,7 +391,7 @@ def parser_main(filename):
     code = ''.join(f.readlines())
     node = ast.parse(code)
     gen_dfs(node)
-    return triple_code_lines
+    return code_slice
 
 
 
