@@ -20,6 +20,7 @@ def cpp_export(filename):
 #include "range_iterator.h"
 #include "dict_iterator.h"
 #include "set_iterator.h"
+#include "list_iterator.h"
 #include "slice.h"
 """
     f = open(filename, 'w')
