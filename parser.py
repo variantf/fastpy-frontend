@@ -95,8 +95,8 @@ def gen_dfs(node):
         target = gen_dfs(node.target)
         it = gen_dfs(node.iter)
         iterator = gen_name()
-        gen_code_triple('call', iterator, '__iter__', [it])
-        continue_stack.append(gen_code_triple('call', target, '__next__', [iterator]))
+        gen_code_triple('call', iterator, 'iter', [it])
+        continue_stack.append(gen_code_triple('call', target, 'next', [iterator]))
         break_stack.append([])
         test = gen_name()
         test_idx = gen_code_triple('==', test, target, ('constant', None))
@@ -105,7 +105,7 @@ def gen_dfs(node):
         for stmt in node.body:
             gen_dfs(stmt)
 
-        gen_code_triple('call', target, '__next__', [iterator])
+        gen_code_triple('call', target, 'next', [iterator])
         gen_code_triple('jmp', test_idx)
         modify_target_for_currentIdx(ed_loop)
 
@@ -124,7 +124,7 @@ def gen_dfs(node):
     elif type(node) is ast.Call:
         tmp_name = gen_name()
         if type(node.func) is ast.Name:
-            gen_code_triple('call', tmp_name, func.id, [gen_dfs(arg) for arg in node.args])
+            gen_code_triple('call', tmp_name, node.func.id, [gen_dfs(arg) for arg in node.args])
         elif type(node.func) is ast.Attribute:
             gen_code_triple('call', tmp_name, node.func.attr, [gen_dfs(node.func.value)] + [gen_dfs(arg) for arg in node.args])
         return tmp_name
@@ -258,8 +258,8 @@ def gen_dfs(node):
         target = gen_dfs(node.target)
         it = gen_dfs(node.iter)
         tmp_iter_name = gen_name()
-        gen_code_triple('call', tmp_iter_name, '__iter__', [it])
-        test_idx = gen_code_triple('call', target, '__next__', [tmp_iter_name])
+        gen_code_triple('call', tmp_iter_name, 'iter', [it])
+        test_idx = gen_code_triple('call', target, 'next', [tmp_iter_name])
         test = gen_name()
         gen_code_triple('==', test, target, ('constant', None))
         ed_idx = gen_code_triple('if', test, 0)

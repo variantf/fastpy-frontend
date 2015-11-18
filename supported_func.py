@@ -151,6 +151,13 @@ supported_functions = {
 	'print'
 }
 
+builtin_func_mapper = {
+	'len': '__len__',
+	'bool': '__bool__',
+	'iter': '__iter__',
+	'next': '__next__',
+}
+
 binary_func_mapper = {
 	'+' : "__add__",
 	'-' : "__sub__",

@@ -115,16 +115,16 @@ TYPE_RULES = {
     '<': REL_OP_RULES,
     '<=': REL_OP_RULES,
     '>=': REL_OP_RULES,
-    '__iter__': [
+    'iter': [
         (['range'], 'range_iterator')
     ],
-    '__next__': [
+    'next': [
         (['range_iterator'], 'int')
     ],
     '__getitem__': [
         (['str', 'int'], 'str')
     ],
-    '__len__': [
+    'len': [
         (['str'], 'int')
     ],
     '__contains__': [
@@ -328,7 +328,7 @@ def infer_type(fn, target, args, state, new_name):
             ret_nodes.add('bool')
         if all_has(args[0], 'set_values') and all_has(args[1], 'set_values'):
             ret_nodes.add('bool')
-    elif fn == '__iter__':
+    elif fn == 'iter':
         list_iterator_owners = all_has(args[0], 'list_values')
         set_iterator_owners = all_has(args[0], 'set_values')
         dict_iterator_owners = all_has(args[0], 'dict_values')
@@ -342,7 +342,7 @@ def infer_type(fn, target, args, state, new_name):
         if dict_iterator_owners:
             add_node(new_name + '.dict_iterator', {'dict_iterator_owners': dict_iterator_owners})
             ret_nodes.add(new_name + '.dict_iterator')
-    elif fn == '__next__':
+    elif fn == 'next':
         ret_nodes.update(chain(args[0], 'list_iterator_owners', 'list_values'))
         ret_nodes.update(chain(args[0], 'set_iterator_owners', 'set_values'))
         ret_nodes.update(chain(args[0], 'dict_iterator_owners', 'dict_keys'))
@@ -374,7 +374,7 @@ def infer_type(fn, target, args, state, new_name):
             add_node(new_name + '.list', {'list_values': chain(lists, 'list_values')})
             ret_nodes.add(new_name + '.list')
         ret_nodes.update(chain(args[0], 'dict_values'))
-    elif fn == '__len__':
+    elif fn == 'len':
         if all_has(args[0], 'list_values') or all_has(args[0], 'set_values') or all_has(args[0], 'dict_values'):
             ret_nodes.add('int')
     elif fn == '__contains__':
@@ -383,7 +383,7 @@ def infer_type(fn, target, args, state, new_name):
     elif fn == '__delitem__':
         if all_has(args[0], 'list_values') and 'int' in args[1] or all_has(args[0], 'dict_values'):
             ret_nodes.add('none')
-    elif fn == '__bool__':
+    elif fn == 'bool':
         ret_nodes.add('bool')
     elif fn == 'append':
         lists = all_has(args[0], 'list_values')

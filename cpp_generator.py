@@ -1,4 +1,4 @@
-from supported_func import supported_functions, binary_func_mapper
+from supported_func import supported_functions, binary_func_mapper, builtin_func_mapper
 import optimizer
 
 def sym_cpp(id):
@@ -23,6 +23,8 @@ def sym_cpp(id):
             return 'make$bool_(%s)' % ('true' if id[1] else 'false')
     raise Exception('Unknow occur in sym_cpp')
 def func_cpp(name, args):
+    if name in builtin_func_mapper:
+        name = builtin_func_mapper[name]
     types = ['' if len(arg[2]) > 1 else list(arg[2])[0] + '_' if list(arg[2])[0] in ['int', 'float', 'bool']  else list(arg[2])[0] for arg in args]
     for i in range(len(types),-1,-1):
         candinate_name = '$'.join([name] + types[:i])
@@ -45,6 +47,8 @@ def cpp_generator(source, tofile):
 #include "range.h"
 #include "range_iterator.h"
 #include "dict_iterator.h"
+#include "list_iterator.h"
+#include "generated.h"
 #include "set_iterator.h"
 #include "slice.h"
 """
@@ -52,13 +56,11 @@ def cpp_generator(source, tofile):
     print(header, file = f)
     main = source['_main$']
     if main['vars']:
-        print('value ', end='', file = f)
-        for var in main['vars']:
-            print(' %s' % var, end='', file = f)
-        print(';', file = f)
+        print('value %s;' % ','.join(main['vars']), file = f)
     for func_name in source:
         code_lines = code_generator(source[func_name]['code'])
-        print('value %s(%s) {\n%s\n}' % ('main' if func_name == '_main$' else func_name, ','.join(source[func_name]['vars']), '\n'.join(code_lines)))
+        print('value %s(%s) {\n%s\n}' % (func_name,'', '\n\t'.join(code_lines)), file = f)
+    print('int main(){_main$();}', file = f)
     f.close()
 
 

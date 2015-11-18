@@ -11,15 +11,13 @@ from cpp_generator import cpp_generator
 
 if len(sys.argv) >= 3:
     funcs = parser_main(sys.argv[1])
-    for func in funcs:
-        src = funcs[func]['code']
-        src = constant_folding(src)
-        src = dead_code(src)
-        src = unused_variable(src)
-        src = successive_jump(src)
-        src = jump_next(src)
-        src = type_inference(src)
-        funcs[func]['code'] = src
-    cpp_generator(src, sys.argv[2])
+    src = funcs['_main$']['code']
+    src = constant_folding(src)
+    src = dead_code(src)
+    src = unused_variable(src)
+    src = successive_jump(src)
+    src = jump_next(src)
+    src = type_inference(src)
+    cpp_generator({'_main$': {'code': src, 'vars': funcs['_main$']['vars']}}, sys.argv[2])
 else:
     print("Usage: main.py from.py to.cpp")
