@@ -144,7 +144,8 @@ TYPE_RULES = {
 
 SIMPLE_NODES = ['none', 'bool', 'int', 'float', 'str', 'range', 'range_iterator', 'slice']
 
-def type_inference(src):
+def type_inference(funcs):
+    return expanded_form(funcs)
     states, states_out = analyzer.analyze_forward(src, merge, step, ({},{}), ({},{}))
     
     def add_type(v, state):
@@ -190,6 +191,72 @@ def type_inference(src):
             raise Exception('Unhandled op: ' + code[0])
         src[i] = tuple(code)
     
+    return src
+
+def expanded_form(funcs):
+    func_names = ['_main$'] + [f for f in funcs.keys() if f != '_main$']
+    func_call_count = {func_name: 0 for func_name in func_names}
+    func_entry = {}
+    func_returning = {}
+    func_new_line = {}
+    func_calls = {func_name: [] for func_name in func_names}
+    
+    for func_name in func_names:
+        for code in funcs[func_name]['code']:
+            if code[0] == 'call' and code[2] in func_names:
+                func_call_count[code[2]] += 1
+    
+    src = []
+    refills = []
+    refill_exits = []
+    for func_name in func_names:
+        func_entry[func_name] = len(src)
+        new_line = []
+        func_new_line[func_name] = new_line
+        for code in funcs[func_name]['code']:
+            new_line.append(len(src))
+            if code[0] == 'call' and code[2] in func_names:
+                params = funcs[code[2]]['paras']
+                args = code[3]
+                if len(params) != len(args):
+                    raise Exception('实参与型参个数不匹配')
+                for i in range(len(params)):
+                    src.append(('=', ('symbol', params[i]), args[i]))
+                func_calls[code[2]].append(len(src))
+                src.append('Call')
+                if code[1] is not None:
+                    src.append(('=', code[1], ('symbol', funcs[code[2]]['return'])))
+            elif code[0] in ['if', 'ifnot', 'jmp']:
+                refills.append((func_name, len(src)))
+                src.append(code)
+            else:
+                src.append(code)
+        new_line.append(len(src))
+        func_returning[func_name] = len(src)
+        if func_call_count[func_name] > 0:
+            src.extend(func_call_count[func_name] * ['Return'])
+        else:
+            refill_exits.append(len(src))
+            src.append('Exit')
+    
+    for func_name in func_names:
+        entry_line = func_entry[func_name]
+        returning_line = func_returning[func_name]
+        for i in range(len(func_calls[func_name])):
+            line = func_calls[func_name][i]
+            src[line] = ('jmp', entry_line)
+            if i == len(func_calls[func_name]) - 1:
+                src[returning_line + i] = ('jmp', line + 1)
+            else:
+                src[returning_line + i] = ('if', None, line + 1)
+    
+    for func_name, line in refills:
+        if src[line][0] in ['if', 'ifnot']:
+            src[line] = (src[line][0], src[line][1], func_new_line[func_name][src[line][2]])
+        else:
+            src[line] = ('jmp', func_new_line[func_name][src[line][1]])
+    for line in refill_exits:
+        src[line] = ('jmp', len(src))
     return src
 
 def merge(states):
