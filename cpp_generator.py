@@ -52,9 +52,7 @@ def cpp_generator(source, tofile):
 #include "set_iterator.h"
 #include "slice.h"
 """
-    print(source.keys())
     supported_functions.update(source.keys())
-    print(supported_functions)
     f = open(tofile, 'w')
     print(header, file = f)
     main = source['_main$']

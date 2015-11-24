@@ -49,8 +49,9 @@ def get_currentIdx(target = None):
 def add_symbol(name, target = None):
     if not target:
         target = code_slice[current_func]['vars']
-    if not name in target and not name in code_slice['_main$']['vars']:
-        target.add(name)
+    local_name = name + '$' + current_func
+    if not name in code_slice[current_func]['global'] and not local_name in code_slice[current_func]['paras']:
+        target.add(local_name)
 
 name_id = 0
 
@@ -58,9 +59,15 @@ def gen_name(n=5):
     #name = '_' + ''.join([random.choice('abcdefghighkmnopqrstuvwxyz') for _ in range(n)]) + '$'
     global name_id
     name_id = name_id + 1
-    name = '_' + str(name_id) + '$' + current_func
+    name = '_' + str(name_id)
     add_symbol(name)
     return ('symbol', name)
+
+def get_name(name):
+    local_name = name + '$' + current_func
+    if local_name in code_slice[current_func]['vars'] or local_name in code_slice[current_func]['paras']:
+        return local_name
+    return name + '$_main$'
 
 continue_stack = []
 break_stack = []
@@ -68,23 +75,27 @@ break_stack = []
 def gen_dfs(node):
     global current_func
     if type(node) is ast.FunctionDef:
-        code_slice[node.name] = {'code': [], 'vars': set(), 'paras': []}
+        code_slice[node.name] = {'code': [], 'vars': set(), 'paras': [], 'global': set(), 'ret': []}
         last_func = current_func
         current_func = node.name
         for arg in node.args.args:
-            code_slice[current_func]['paras'].append(arg.arg)
+            code_slice[current_func]['paras'].append(arg.arg + '$' + current_func)
+        add_symbol('$$ret')
         for stmt in node.body:
             gen_dfs(stmt)
+        for l in code_slice[current_func]['ret']:
+            modify_target_for_currentIdx(l)
         current_func = last_func
     elif type(node) is ast.Return:
-        gen_code_triple('return', gen_dfs(node.value))
+        gen_code_triple('=', get_name('$$ret'), gen_dfs(node.value))
+        code_slice[current_func]['ret'].append(gen_code_triple('jmp', 0))
     elif type(node) is ast.Global:
         for name in node.names:
-            code_slice['_main$']['vars'].add(name)
-            code_slice[current_func]['vars'].discard(name)
+            code_slice['_main$']['vars'].add(name + '$_main$')
+            code_slice[current_func]['global'].add(name)
     elif type(node) is ast.Module:
         current_func = '_main$'
-        code_slice[current_func] = {'code': [], 'vars': set()}
+        code_slice[current_func] = {'code': [], 'vars': set(), 'global': set(), 'paras': []}
         body = node.body
         for stmt in body:
             gen_dfs(stmt)
@@ -131,12 +142,12 @@ def gen_dfs(node):
     elif type(node) is ast.Name:
         ctx = node.ctx
         if type(ctx) is ast.Load:
-            return ('symbol', node.id)
+            return ('symbol', get_name(node.id))
         elif type(ctx) is ast.Store:
-            add_symbol(node.id + '$' + current_func)
-            return ('symbol', node.id)
+            add_symbol(node.id)
+            return ('symbol', get_name(node.id))
         elif type(ctx) is ast.Del:
-            gen_code_triple('call', None, '__delitem__', [('symbol', node.id)])
+            gen_code_triple('call', None, '__delitem__', [('symbol', get_name(node.id))])
         else:
             raise Exception('Unknown ctx for Name')
     elif type(node) is ast.Assign:
