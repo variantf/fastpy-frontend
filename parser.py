@@ -81,13 +81,15 @@ def gen_dfs(node):
         for arg in node.args.args:
             code_slice[current_func]['paras'].append(arg.arg + '$' + current_func)
         add_symbol('_$$ret')
+        gen_code_triple('=', ('symbol', get_name('_$$ret')), ('constant', None))
         for stmt in node.body:
             gen_dfs(stmt)
         for l in code_slice[current_func]['ret']:
             modify_target_for_currentIdx(l)
         current_func = last_func
     elif type(node) is ast.Return:
-        gen_code_triple('=', get_name('_$$ret'), gen_dfs(node.value))
+        if node.value is not None:
+            gen_code_triple('=', ('symbol', get_name('_$$ret')), gen_dfs(node.value))
         code_slice[current_func]['ret'].append(gen_code_triple('jmp', 0))
     elif type(node) is ast.Global:
         for name in node.names:

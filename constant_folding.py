@@ -96,7 +96,12 @@ def step(old, code, line_num):
     
     return new
 
-def constant_folding(src):
+def constant_folding(funcs):
+    for func_name in funcs:
+        funcs[func_name]['code'] = do_folding(funcs[func_name]['code'])
+    return funcs
+
+def do_folding(src):
     (state, state_out) = analyzer.analyze_forward(src, merge, step, dict(), dict())
     
     for i in range(len(src)):

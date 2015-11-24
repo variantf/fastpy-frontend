@@ -3,6 +3,12 @@ import copy
 import analyzer
 from optimizer import UNARY_OPERATORS, BINARY_OPERATORS, remove_lines
 
+def unused_variable(funcs):
+    raise Exception('FIXME: global variable is never unused')
+    for func_name in funcs:
+        funcs[func_name]['code'] = do_unused_variable(funcs[func_name]['code'], {'_$$ret$' + func_name})
+    return funcs
+
 def merge(states):
     merged = set()
     for s in states:
@@ -36,8 +42,8 @@ def step(state, code, line_num):
         raise Exception("Unhandled op: " + code[0])
     return new
 
-def unused_variable(src):
-    states, states_out = analyzer.analyze_backward(src, merge, step, set())
+def do_unused_variable(src, final_usage):
+    states, states_out = analyzer.analyze_backward(src, merge, step, final_usage)
     
     to_remove = []
     for i in range(len(src)):

@@ -1,7 +1,12 @@
 import analyzer
 from optimizer import remove_lines
 
-def dead_code(src):
+def dead_code(funcs):
+    for func_name in funcs:
+        funcs[func_name]['code'] = do_dead_code(funcs[func_name]['code'])
+    return funcs
+
+def do_dead_code(src):
     def merge(states):
         return any(states)
     def step(old_state,code,line_num):

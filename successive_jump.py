@@ -1,4 +1,9 @@
-def successive_jump(src):
+def successive_jump(funcs):
+    for func_name in funcs:
+        funcs[func_name]['code'] = do_successive_jump(funcs[func_name]['code'])
+    return funcs
+
+def do_successive_jump(src):
     def trace_jump(start, now):
         jumped = {start}
         while now not in jumped:

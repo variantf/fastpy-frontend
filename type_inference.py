@@ -145,53 +145,58 @@ TYPE_RULES = {
 SIMPLE_NODES = ['none', 'bool', 'int', 'float', 'str', 'range', 'range_iterator', 'slice']
 
 def type_inference(funcs):
-    return expanded_form(funcs)
+    src, func_new_line = expanded_form(funcs)
     states, states_out = analyzer.analyze_forward(src, merge, step, ({},{}), ({},{}))
+    #for i in range(len(src)):
+    #    print(i, src[i], '\033[94m', states[i], '\033[0m')
     
     def add_type(v, state):
         symbols, nodes = state
         if v[0] == 'symbol':
             infered = set()
-            for node_name in symbols[v[1]]:
-                if node_name in SIMPLE_NODES:
-                    infered.add(node_name)
-                elif 'list_values' in nodes[node_name]:
-                    infered.add('list')
-                elif 'set_values' in nodes[node_name]:
-                    infered.add('set')
-                elif 'dict_values' in nodes[node_name]:
-                    infered.add('dict')
-                elif 'list_iterator_owners' in nodes[node_name]:
-                    infered.add('list_iterator')
-                elif 'set_iterator_owners' in nodes[node_name]:
-                    infered.add('set_iterator')
-                elif 'dict_iterator_owners' in nodes[node_name]:
-                    infered.add('dict_iterator')
+            if v[1] in symbols:
+                for node_name in symbols[v[1]]:
+                    if node_name in SIMPLE_NODES:
+                        infered.add(node_name)
+                    elif 'list_values' in nodes[node_name]:
+                        infered.add('list')
+                    elif 'set_values' in nodes[node_name]:
+                        infered.add('set')
+                    elif 'dict_values' in nodes[node_name]:
+                        infered.add('dict')
+                    elif 'list_iterator_owners' in nodes[node_name]:
+                        infered.add('list_iterator')
+                    elif 'set_iterator_owners' in nodes[node_name]:
+                        infered.add('set_iterator')
+                    elif 'dict_iterator_owners' in nodes[node_name]:
+                        infered.add('dict_iterator')
             return ('symbol', v[1], infered)
         if v[0] == 'constant':
             return ('constant', v[1], {constant_type(v[1])})
         raise Exception("Unknown value: " + str(v))
     
-    for i in range(len(src)):
-        code = list(src[i])
-        if code[0] in UNARY_OPERATORS:
-            code[1] = add_type(code[1], states_out[i])
-            code[2] = add_type(code[2], states[i])
-        elif code[0] in BINARY_OPERATORS:
-            code[1] = add_type(code[1], states_out[i])
-            code[2] = add_type(code[2], states[i])
-            code[3] = add_type(code[3], states[i])
-        elif code[0] == 'call':
-            if code[1] is not None:
-                code[1] = add_type(code[1], states_out[i])
-            code[3] = [add_type(x, states[i]) for x in code[3]]
-        elif code[0] in ['if', 'ifnot']:
-            code[1] = add_type(code[1], states[i])
-        elif code[0] != 'jmp':
-            raise Exception('Unhandled op: ' + code[0])
-        src[i] = tuple(code)
+    for func_name in funcs:
+        for i in range(len(funcs[func_name]['code'])):
+            code = list(funcs[func_name]['code'][i])
+            state = states[func_new_line[func_name][i]]
+            if code[0] in UNARY_OPERATORS:
+                #code[1] = add_type(code[1], states_out[i])
+                code[2] = add_type(code[2], state)
+            elif code[0] in BINARY_OPERATORS:
+                #code[1] = add_type(code[1], states_out[i])
+                code[2] = add_type(code[2], state)
+                code[3] = add_type(code[3], state)
+            elif code[0] == 'call':
+                #if code[1] is not None:
+                #    code[1] = add_type(code[1], states_out[i])
+                code[3] = [add_type(x, state) for x in code[3]]
+            elif code[0] in ['if', 'ifnot']:
+                code[1] = add_type(code[1], state)
+            elif code[0] != 'jmp':
+                raise Exception('Unhandled op: ' + code[0])
+            funcs[func_name]['code'][i] = tuple(code)
     
-    return src
+    return funcs
 
 def expanded_form(funcs):
     func_names = ['_main$'] + [f for f in funcs.keys() if f != '_main$']
@@ -225,7 +230,7 @@ def expanded_form(funcs):
                 func_calls[code[2]].append(len(src))
                 src.append('Call')
                 if code[1] is not None:
-                    src.append(('=', code[1], ('symbol', funcs[code[2]]['return'])))
+                    src.append(('=', code[1], ('symbol', '_$$ret$' + code[2])))
             elif code[0] in ['if', 'ifnot', 'jmp']:
                 refills.append((func_name, len(src)))
                 src.append(code)
@@ -248,7 +253,7 @@ def expanded_form(funcs):
             if i == len(func_calls[func_name]) - 1:
                 src[returning_line + i] = ('jmp', line + 1)
             else:
-                src[returning_line + i] = ('if', None, line + 1)
+                src[returning_line + i] = ('if', ('symbol', '?'), line + 1)
     
     for func_name, line in refills:
         if src[line][0] in ['if', 'ifnot']:
@@ -257,7 +262,7 @@ def expanded_form(funcs):
             src[line] = ('jmp', func_new_line[func_name][src[line][1]])
     for line in refill_exits:
         src[line] = ('jmp', len(src))
-    return src
+    return src, func_new_line
 
 def merge(states):
     new_symbols = dict()
@@ -503,11 +508,3 @@ def print_state(state):
     print('Nodes:')
     for node in nodes:
         print('\t', node, ':', nodes[node])
-
-if __name__ == '__main__':
-    print(infer_type('+', [('list', ('int',)), ('list', ('any',))]))
-    print(infer_type('+', [('list', ('int',)), ('list', ('list', ('str',)))]))
-    print(infer_type('~', [('dynamic',)]))
-    print(infer_type('+', [('dynamic',), ('int',)]))
-    print(infer_type('+', [('dynamic',), ('list', ('int',))]))
-    print(infer_type('append', [('list', ('int',)), ('int',)]))

@@ -1,6 +1,10 @@
 from optimizer import remove_lines
-
-def jump_next(src):
+def jump_next(funcs):
+    for func_name in funcs:
+        funcs[func_name]['code'] = do_jump_next(funcs[func_name]['code'])
+    return funcs
+    
+def do_jump_next(src):
     to_remove = True
     while to_remove:
         to_remove = []
