@@ -20,3 +20,11 @@ def h():
 def i(x):
     x = 4
     return x + 5
+def foo():
+    if 1:
+        return
+    elif 2:
+        return 3
+    elif 3:
+        return 4
+    x = 4
