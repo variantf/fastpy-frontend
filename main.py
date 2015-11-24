@@ -11,6 +11,7 @@ from cpp_generator import cpp_generator
 
 if len(sys.argv) >= 3:
     funcs = parser_main(sys.argv[1])
+    print(funcs)
     src = funcs['_main$']['code']
     src = constant_folding(src)
     src = dead_code(src)

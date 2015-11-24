@@ -58,7 +58,7 @@ def gen_name(n=5):
     #name = '_' + ''.join([random.choice('abcdefghighkmnopqrstuvwxyz') for _ in range(n)]) + '$'
     global name_id
     name_id = name_id + 1
-    name = '_' + str(name_id) + '$'
+    name = '_' + str(name_id) + '$' + current_func
     add_symbol(name)
     return ('symbol', name)
 
@@ -72,7 +72,7 @@ def gen_dfs(node):
         last_func = current_func
         current_func = node.name
         for arg in node.args.args:
-            code_slice[current_func]['paras'].append(arg)
+            code_slice[current_func]['paras'].append(arg.arg)
         for stmt in node.body:
             gen_dfs(stmt)
         current_func = last_func
@@ -133,7 +133,7 @@ def gen_dfs(node):
         if type(ctx) is ast.Load:
             return ('symbol', node.id)
         elif type(ctx) is ast.Store:
-            add_symbol(node.id)
+            add_symbol(node.id + '$' + current_func)
             return ('symbol', node.id)
         elif type(ctx) is ast.Del:
             gen_code_triple('call', None, '__delitem__', [('symbol', node.id)])
