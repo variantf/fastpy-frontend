@@ -1,4 +1,7 @@
 a = []
+a.append([1,2,3])
+a.append('123')
+l = len(a[0])
 a = [a]
 a = [a]
 b = a

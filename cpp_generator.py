@@ -65,7 +65,7 @@ def cpp_generator(source, tofile):
         code_lines = code_generator(source[func_name]['code'])
         if '_$$ret$%s' % func_name in source[func_name]['vars']:
             code_lines.append('return _$$ret$%s;' % func_name)
-        print('value %s(%s) {\n\t%s\n}' % (func_name, ', '.join(['value %s' % arg for arg in source[func_name]['paras']]), '\n\t'.join(code_lines)), file = f)
+        print('value %s(%s) {\n\t%s\n}' % (func_name, ', '.join(['value %s' % arg for arg in source[func_name]['paras']]), ('' if func_name == '_main$' else 'value ' + ', '.join(source[func_name]['vars']) + ';\n\t') + '\n\t'.join(code_lines)), file = f)
     print('int main(){_main$();}', file = f)
     f.close()
 
