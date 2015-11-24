@@ -59,9 +59,9 @@ def gen_name(n=5):
     #name = '_' + ''.join([random.choice('abcdefghighkmnopqrstuvwxyz') for _ in range(n)]) + '$'
     global name_id
     name_id = name_id + 1
-    name = '_' + str(name_id)
+    name = '_' + str(name_id) + '$'
     add_symbol(name)
-    return ('symbol', name)
+    return ('symbol', name + '$' + current_func)
 
 def get_name(name):
     local_name = name + '$' + current_func
