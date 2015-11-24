@@ -34,7 +34,8 @@ test_funcs = {
 }
 
 if len(sys.argv) >= 3:
-    #funcs = parser_main(sys.argv[1])
+    funcs = parser_main(sys.argv[1])
+    print(funcs)
     src = type_inference(test_funcs)
     for i in range(len(src)):
         print(i, src[i])
