@@ -57,10 +57,15 @@ def cpp_generator(source, tofile):
     print(header, file = f)
     main = source['_main$']
     if main['vars']:
-        print('value %s;' % ','.join(main['vars']), file = f)
+        print('value %s;' % ', '.join(main['vars']), file = f)
+
+    for func_name in source:
+        print('value %s(%s);\n' % (func_name, ', '.join(['value %s' % arg for arg in source[func_name]['paras']])), file = f)
     for func_name in source:
         code_lines = code_generator(source[func_name]['code'])
-        print('value %s(%s) {\n%s\n}' % (func_name,'', '\n\t'.join(code_lines)), file = f)
+        if '_$$ret$%s' % func_name in source[func_name]['vars']:
+            code_lines.append('return _$$ret$%s;' % func_name)
+        print('value %s(%s) {\n\t%s\n}' % (func_name, ', '.join(['value %s' % arg for arg in source[func_name]['paras']]), '\n\t'.join(code_lines)), file = f)
     print('int main(){_main$();}', file = f)
     f.close()
 
@@ -89,10 +94,10 @@ def code_generator(lines):
             cpp_code.append('goto L'+str(code_tuple[1]))
             jmp_targets.add(code_tuple[1])
         elif code_tuple[0] == 'if':
-            cpp_code.append('if(%s) goto L%s' % (sym_cpp(code_tuple[1]), code_tuple[2]))
+            cpp_code.append('if(%s.boolval) goto L%s' % (sym_cpp(code_tuple[1]), code_tuple[2]))
             jmp_targets.add(code_tuple[2])
         elif code_tuple[0] == 'ifnot':
-            cpp_code.append('if(!%s) goto L%s' % (sym_cpp(code_tuple[1]), code_tuple[2]))
+            cpp_code.append('if(!%s.boolval) goto L%s' % (sym_cpp(code_tuple[1]), code_tuple[2]))
             jmp_targets.add(code_tuple[2])
 
     for i in range(len(cpp_code)):

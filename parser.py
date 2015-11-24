@@ -9,7 +9,7 @@ code_slice = {}
 def gen_code_triple(code_type, a, b = None, c = None, target = None):
     if not target:
         target = code_slice[current_func]['code']
-    if code_type in ['jmp', 'return']:
+    if code_type in ['jmp']:
         target.append((code_type, a))
     elif code_type in optimizer.BINARY_OPERATORS:
         target.append((code_type, a, b, c))
@@ -197,7 +197,9 @@ def gen_dfs(node):
             raise Exception('Unknown unary operator')
     elif type(node) is ast.If:
         test = gen_dfs(node.test)
-        test_idx = gen_code_triple('ifnot', test, 0)
+        test_bool = gen_name()
+        gen_code_triple('call', test_bool, '__bool__', [test])
+        test_idx = gen_code_triple('ifnot', test_bool, 0)
         for stmt in node.body:
             gen_dfs(stmt)
         if node.orelse:
@@ -218,7 +220,9 @@ def gen_dfs(node):
                 tmp_result = gen_dfs(value)
                 gen_code_triple('=', ret_name, tmp_result)
                 if i != len(node.values) - 1:
-                    goto_ed.append(gen_code_triple('ifnot', tmp_result, 0))
+                    tmp_result_bool = gen_name()
+                    gen_code_triple('call', tmp_result_bool, '__bool__', [tmp_result])
+                    goto_ed.append(gen_code_triple('ifnot', tmp_result_bool, 0))
             for idx in goto_ed:
                 modify_target_for_currentIdx(idx)
             return ret_name
@@ -229,7 +233,9 @@ def gen_dfs(node):
                 tmp_result = gen_dfs(value)
                 gen_code_triple('=', ret_name, tmp_result)
                 if i != len(node.values) - 1:
-                    goto_ed.append(gen_code_triple('if', tmp_result, 0))
+                    tmp_result_bool = gen_name()
+                    gen_code_triple('call', tmp_result_bool, '__bool__', [tmp_result])
+                    goto_ed.append(gen_code_triple('if', tmp_result_bool, 0))
             for idx in goto_ed:
                 modify_target_for_currentIdx(idx)
             return tmp_result
@@ -278,7 +284,9 @@ def gen_dfs(node):
         ed_idx = gen_code_triple('if', test, 0)
         for _if in node.ifs:
             if_name = gen_dfs(_if)
-            gen_code_triple('ifnot', if_name, test_idx)
+            if_bool = gen_name()
+            gen_code_triple('call', if_bool, '__bool__', [if_name])
+            gen_code_triple('ifnot', if_bool, test_idx)
         return (test_idx, ed_idx)
     elif type(node) is ast.ListComp:
         tmp_lst_name = gen_name()
@@ -353,7 +361,9 @@ def gen_dfs(node):
         start_idx = get_currentIdx()
         continue_stack.append(start_idx)
         test_name = gen_dfs(node.test)
-        end_idx = gen_code_triple('ifnot', test_name, 0)
+        test_name_bool = gen_name()
+        gen_code_triple('call', test_name_bool, '__bool__', [test_name])
+        end_idx = gen_code_triple('ifnot', test_name_bool, 0)
         break_stack.append([])
 
         for stmt in node.body:

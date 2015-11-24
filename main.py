@@ -29,7 +29,6 @@ if len(sys.argv) >= 3:
     funcs = jump_next(funcs)
     funcs = type_inference(funcs)
     print_funcs(funcs)
-    exit(0)
     cpp_generator(funcs, sys.argv[2])
 else:
     print("Usage: main.py from.py to.cpp")
