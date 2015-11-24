@@ -13,10 +13,10 @@ from cpp_generator import cpp_generator
 def print_funcs(funcs):
     for func_name in funcs:
         print(func_name)
-        print('vars', funcs[func_name]['vars'])
-        print('paras', funcs[func_name]['paras'])
+        print(' variables', funcs[func_name]['vars'])
+        print(' parameters', funcs[func_name]['paras'])
         for i in range(len(funcs[func_name]['code'])):
-            print('\t', i, funcs[func_name]['code'][i])
+            print('  \033[91m', i, '\033[0m', funcs[func_name]['code'][i])
 
 if len(sys.argv) >= 3:
     funcs = parser_main(sys.argv[1])

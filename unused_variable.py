@@ -1,12 +1,18 @@
 import copy
+import re
 
 import analyzer
 from optimizer import UNARY_OPERATORS, BINARY_OPERATORS, remove_lines
 
 def unused_variable(funcs):
-    raise Exception('FIXME: global variable is never unused')
+    global_vars = set()
+    for v in funcs['_main$']['vars']:
+        if not re.match(r'^_\d+\$\$_main\$$', v):
+            global_vars.add(v)
+    
     for func_name in funcs:
-        funcs[func_name]['code'] = do_unused_variable(funcs[func_name]['code'], {'_$$ret$' + func_name})
+        final_usage = global_vars | {'_$$ret$' + func_name}
+        funcs[func_name]['code'] = do_unused_variable(funcs[func_name]['code'], final_usage)
     return funcs
 
 def merge(states):
