@@ -27,10 +27,10 @@ def func_cpp(name, args):
         name = builtin_func_mapper[name]
     types = ['' if len(arg[2]) > 1 else list(arg[2])[0] + '_' if list(arg[2])[0] in ['int', 'float', 'bool']  else list(arg[2])[0] for arg in args]
     for i in range(len(types),-1,-1):
-        candinate_name = '$'.join([name] + types[:i])
+        candinate_name = '$'.join([name] + types[:i] + [''] * (len(types) - i))
         if candinate_name in supported_functions:
             return candinate_name
-    raise Exception('Cannot find func ' + name)
+    return name;
 
 def cpp_generator(source, tofile):
     header = """
