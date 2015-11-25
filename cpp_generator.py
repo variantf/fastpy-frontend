@@ -1,7 +1,14 @@
 from supported_func import supported_functions, binary_func_mapper, builtin_func_mapper
 import optimizer
 
+string_constant_table = {
+    
+}
+
+constant_no = 0
+
 def sym_cpp(id):
+    global constant_no
     if id[0] == 'symbol':
         return id[1]
     elif id[0] == 'constant':
@@ -14,7 +21,11 @@ def sym_cpp(id):
         elif type(id[1]) == set:
             return 'make$set()'
         elif type(id[1]) == str:
-            return 'make$str("%s")' % repr(id[1])[1:-1];
+            raw = repr(id[1])[1:-1]
+            if not raw in string_constant_table:
+                string_constant_table[raw] = '_c' + str(constant_no) + '$'
+                constant_no = constant_no + 1
+            return string_constant_table[raw]
         elif type(id[1]) == int:
             return 'make$int_(%s)' % id[1]
         elif type(id[1]) == float:
@@ -63,9 +74,17 @@ def cpp_generator(source, tofile):
         print('value %s(%s);\n' % (func_name, ', '.join(['value %s' % arg for arg in source[func_name]['paras']])), file = f)
     for func_name in source:
         code_lines = code_generator(source[func_name]['code'])
+        source[func_name]['code_lines'] = code_lines
+
+    for con in string_constant_table:
+        print('value %s = make$str("%s");\n' % (string_constant_table[con], con), file = f)
+
+    for func_name in source:
+        code_lines = source[func_name]['code_lines']
         if '_$$ret$%s' % func_name in source[func_name]['vars']:
             code_lines.append('return _$$ret$%s;' % func_name)
         print('value %s(%s) {\n\t%s\n}' % (func_name, ', '.join(['value %s' % arg for arg in source[func_name]['paras']]), ('' if func_name == '_main$' else 'value ' + ', '.join(source[func_name]['vars']) + ';\n\t') + '\n\t'.join(code_lines)), file = f)
+
     print('int main(){_main$();}', file = f)
     f.close()
 

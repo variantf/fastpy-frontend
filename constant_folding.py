@@ -21,7 +21,7 @@ def step(old, code, line_num):
     
     def get_value(v):
         if v[0] == 'constant':
-            if type(v[1]) in [type(None), bool, int, float, str]:
+            if type(v[1]) in [type(None), bool, int, float]:
                 return (True, v[1])
             else:
                 return (False, None)
