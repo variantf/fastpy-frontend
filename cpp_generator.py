@@ -34,14 +34,20 @@ def sym_cpp(id):
             return 'make$bool_(%s)' % ('true' if id[1] else 'false')
     raise Exception('Unknow occur in sym_cpp')
 def func_cpp(name, args):
-    if name in builtin_func_mapper:
-        name = builtin_func_mapper[name]
-    types = ['' if len(arg[2]) > 1 else list(arg[2])[0] + '_' if list(arg[2])[0] in ['int', 'float', 'bool']  else list(arg[2])[0] for arg in args]
-    for i in range(len(types),-1,-1):
-        candinate_name = '$'.join([name] + types[:i] + [''] * (len(types) - i))
-        if candinate_name in supported_functions:
-            return candinate_name
-    return name;
+    try:
+        if name in builtin_func_mapper:
+            name = builtin_func_mapper[name]
+        if name in supported_functions:
+            return name
+        types = ['' if len(arg[2]) > 1 else list(arg[2])[0] + '_' if list(arg[2])[0] in ['int', 'float', 'bool']  else list(arg[2])[0] for arg in args]
+        for i in range(len(types),-1,-1):
+            candinate_name = '$'.join([name] + types[:i] + [''] * (len(types) - i))
+            if candinate_name in supported_functions:
+                return candinate_name
+        return name;
+    except Exception  as e:
+        print(name)
+        print(args)
 
 def cpp_generator(source, tofile):
     header = """

@@ -332,7 +332,7 @@ def gen_dfs(node):
         return gen_dfs(node.value)
     elif type(node) is ast.Slice:
         tmp_name = gen_name()
-        paras = [('constant', None), ('constant', None), ('constant', None)]
+        paras = [('constant', None), ('constant', None), ('constant', 1)]
         if node.lower:
             paras[0] = gen_dfs(node.lower)
         if node.upper:
